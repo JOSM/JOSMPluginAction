@@ -1,11 +1,24 @@
 name: Java CI
-env:
-  junit_platform_version: '1.9.0'
-  # ANT_HOME is also our ant version
-  ANT_HOME: 'apache-ant-1.10.12'
 
 on:
   workflow_call:
+    inputs:
+      revision:
+        type: string
+        default: ''
+      operating_system:
+        type: string
+        default: ubuntu-latest
+      java_version:
+        type: number
+        default: 8
+      java_distribution:
+        type: string
+        default: temurin
+
+env:
+  # ANT_HOME is also our ant version
+  ANT_HOME: 'apache-ant-1.10.12'
 
 jobs:
   josm-revision:
@@ -16,7 +29,8 @@ jobs:
     - name: Get JOSM revision
       id: josm-revision
       run: |
-        if [ ! -v REVISION ]; then
+        REVISION=${{ inputs.revision }}
+        if [ -z "${REVISION}" ]; then
           REVISION=$(svn info https://josm.openstreetmap.de/svn/trunk | grep Revision | awk '{print $2}')
         elif [ "tested" == "${REVISION}" ]; then
           REVISION=$(curl https://josm.openstreetmap.de/tested)
@@ -28,7 +42,7 @@ jobs:
       shell: bash
 
   josm-build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.operating_system }}
     needs: josm-revision
     steps:
     - name: Cache JOSM
@@ -39,19 +53,19 @@ jobs:
           josm/core/dist/josm-custom.jar
           josm/core/test/build
         key: josm-r${{ needs.josm-revision.outputs.josm-revision }}
-    - name: Set up JDK 8
+    - name: Set up JDK ${{ inputs.java_version }}
       if: steps.cache-josm.outputs.cache-hit != 'true'
       uses: actions/setup-java@v3
       with:
-        java-version: '8'
-        distribution: 'temurin'
+        java-version: ${{ inputs.java_version }}
+        distribution: ${{ inputs.java_distribution }}
     - name: Clone JOSM
       if: steps.cache-josm.outputs.cache-hit != 'true'
       run: |
-        svn co --depth=immediates --revision=${{ steps.josm-revision.outputs.josm-revision}} https://josm.openstreetmap.de/osmsvn/applications/editors/josm $GITHUB_WORKSPACE/josm
+        svn co --depth=immediates https://josm.openstreetmap.de/osmsvn/applications/editors/josm $GITHUB_WORKSPACE/josm
         cd $GITHUB_WORKSPACE/josm
-        svn up --set-depth=infinity --accept=theirs-full core
-        svn propget svn:externals | grep core | xargs -L1 svn co
+        svn up --revision=${{ steps.josm-revision.outputs.josm-revision }} --set-depth=infinity --accept=theirs-full core
+        svn propget svn:externals | grep core | xargs -L1 svn co --revision=${{ steps.josm-revision.outputs.josm-revision }}
     - name: Cache dependencies
       uses: actions/cache@v3.0.0
       if: steps.cache-josm.outputs.cache-hit != 'true'
@@ -75,24 +89,26 @@ jobs:
         path: josm/core/test/build
   plugin-build:
     runs-on: ubuntu-latest
-    needs: josm-build
+    needs: [josm-revision, josm-build]
     steps:
-    - name: Set up JDK 8
+    - name: Set up JDK ${{ inputs.java_version }}
+      if: steps.cache-josm.outputs.cache-hit != 'true'
       uses: actions/setup-java@v3
       with:
-        java-version: '8'
-        distribution: 'temurin'
+        java-version: ${{ inputs.java_version }}
+        distribution: ${{ inputs.java_distribution }}
     - name: Clone JOSM
       run: |
         svn co --depth=immediates https://josm.openstreetmap.de/osmsvn/applications/editors/josm $GITHUB_WORKSPACE/josm
         cd $GITHUB_WORKSPACE/josm
-        svn up --set-depth=immediates core plugins
+        svn up --set-depth=immediates --revision=${{ steps.josm-revision.outputs.josm-revision }} core
+        svn up --set-depth=immediates plugins
         svn up --set-depth=infinity --accept=theirs-full i18n plugins/{00_core_test_config,00_core_test_lib,00_core_tools,00_tools}
         svn propget svn:externals | grep core | xargs -L1 svn co --depth=empty
         cd core
-        svn up ivy.xml ivysettings.xml
+        svn up --revision=${{ steps.josm-revision.outputs.josm-revision }} ivy.xml ivysettings.xml
         cd ../plugins
-        svn propget svn:externals | grep 00_core | xargs -L1 svn co
+        svn propget svn:externals | grep 00_core | xargs -L1 svn co --revision=${{ steps.josm-revision.outputs.josm-revision }}
     - uses: actions/checkout@v3
       with:
         path: josm/plugins/${{ github.event.repository.name }}
