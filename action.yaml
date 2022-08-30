@@ -22,7 +22,9 @@ jobs:
     - name: Get JOSM revision
       id: josm-revision
       run: |
-        REVISION=$(svn info https://josm.openstreetmap.de/svn/trunk | grep Revision | awk '{print $2}')
+        if [ ! -v REVISION ]; then
+          REVISION=$(svn info https://josm.openstreetmap.de/svn/trunk | grep Revision | awk '{print $2}')
+        fi
         echo $REVISION
         echo "::set-output name=josm-revision::${REVISION}"
       shell: bash
@@ -43,7 +45,7 @@ jobs:
     - name: Clone JOSM
       if: steps.cache-josm.outputs.cache-hit != 'true'
       run: |
-        svn co --depth=immediates https://josm.openstreetmap.de/osmsvn/applications/editors/josm $GITHUB_WORKSPACE/josm
+        svn co --depth=immediates --revision=${{ steps.josm-revision.outputs.josm-revision}} https://josm.openstreetmap.de/osmsvn/applications/editors/josm $GITHUB_WORKSPACE/josm
         cd $GITHUB_WORKSPACE/josm
         svn up --set-depth=infinity --accept=theirs-full core
         svn propget svn:externals | grep core | xargs -L1 svn co
