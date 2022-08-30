@@ -5,15 +5,7 @@ env:
   ANT_HOME: 'apache-ant-1.10.12'
 
 on:
-  push:
-    branches:
-      - $default-branch
-      - $protected-branches
-  pull_request:
-    branches:
-      - $default-branch
-  release:
-    types: [created]
+  workflow_call:
 
 jobs:
   josm-revision:
@@ -26,6 +18,10 @@ jobs:
       run: |
         if [ ! -v REVISION ]; then
           REVISION=$(svn info https://josm.openstreetmap.de/svn/trunk | grep Revision | awk '{print $2}')
+        elif [ "tested" == "${REVISION}" ]; then
+          REVISION=$(curl https://josm.openstreetmap.de/tested)
+        elif [ "latest" == "${REVISION}" ]; then
+          REVISION=$(curl https://josm.openstreetmap.de/latest)
         fi
         echo $REVISION
         echo "::set-output name=josm-revision::${REVISION}"
