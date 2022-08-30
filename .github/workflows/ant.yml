@@ -206,7 +206,7 @@ jobs:
         report_paths: 'josm/plugins/${{ github.event.repository.name }}/test/report/TEST*.xml'
   release:
     runs-on: ubuntu-latest
-    needs: [build-plugin, test-plugin]
+    needs: [plugin-build, plugin-test]
     steps:
     - uses: actions/download-artifact@v3
       with:
