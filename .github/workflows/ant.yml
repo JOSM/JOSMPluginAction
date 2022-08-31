@@ -35,7 +35,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: josm-build
     steps:
-    - uses: tsmock/JOSMPluginAction/.github/actions/josm_build@main
     - name: Set up JDK ${{ inputs.java-version }}
       if: steps.cache-josm.outputs.cache-hit != 'true'
       uses: actions/setup-java@v3
@@ -43,6 +42,13 @@ jobs:
         java-version: ${{ inputs.java-version }}
         distribution: ${{ inputs.java-distribution }}
     - uses: tsmock/JOSMPluginAction/.github/actions/plugin_clone@main
+    - name: Cache dependencies
+      uses: actions/cache@v3.0.0
+      with:
+        path: |
+          ~/.ivy2/cache/
+          $GITHUB_WORKSPACE/josm/core/tools/
+        key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
     - name: Build with Ant
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
@@ -71,6 +77,13 @@ jobs:
         distribution: ${{ inputs.java-distribution }}
 
     - uses: tsmock/JOSMPluginAction/.github/actions/plugin_clone@main
+    - name: Cache dependencies
+      uses: actions/cache@v3.0.0
+      with:
+        path: |
+          ~/.ivy2/cache/
+          $GITHUB_WORKSPACE/josm/core/tools/
+        key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
 
     - uses: actions/download-artifact@v3
       with:
