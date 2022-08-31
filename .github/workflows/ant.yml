@@ -40,7 +40,7 @@ jobs:
     steps:
     - uses: tsmock/JOSMPluginAction/.github/actions/plugin_clone@main
       with:
-        josm-revision: ${{ inputs.josm-revision }}
+        josm-revision: ${{ needs.josm-build.outputs.josm-revision }}
         josm-test-revision: ${{ inputs.josm-test-revision }}
         java-version: ${{ inputs.java-version }}
         java-distribution: ${{ inputs.java-distribution }}
@@ -57,11 +57,11 @@ jobs:
 
   plugin-test:
     runs-on: ${{ inputs.operating-system }}
-    needs: plugin-build
+    needs: [josm-build, plugin-build]
     steps:
     - uses: tsmock/JOSMPluginAction/.github/actions/plugin_clone@main
       with:
-        josm-revision: ${{ inputs.josm-revision }}
+        josm-revision: ${{ needs.josm-build.outputs.josm-revision }}
         josm-test-revision: ${{ inputs.josm-test-revision }}
         java-version: ${{ inputs.java-version }}
         java-distribution: ${{ inputs.java-distribution }}
