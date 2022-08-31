@@ -111,9 +111,9 @@ jobs:
       with:
         key: ${{ runner.os }}-${{ github.sha }}
         path: |
-          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}.jar
-          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-javadoc.jar
-          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-sources.jar
+          josm/dist/${{ github.event.repository.name }}.jar
+          josm/dist/${{ github.event.repository.name }}-javadoc.jar
+          josm/dist/${{ github.event.repository.name }}-sources.jar
     - name: Release
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')

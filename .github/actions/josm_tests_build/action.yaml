@@ -62,7 +62,7 @@ runs:
     with:
       path: |
         ~/.ivy2/cache/
-        $GITHUB_WORKSPACE/josm/core/tools/
+        josm/core/tools/
       key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
 
   - name: build JOSM tests

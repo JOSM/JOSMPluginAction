@@ -46,14 +46,14 @@ runs:
     with:
       path: |
         ~/.ivy2/cache/
-        $GITHUB_WORKSPACE/josm/core/tools/
+        josm/core/tools/
       key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
   - name: Restore JOSM cache
     id: cache-josm
     uses: actions/cache@v3.0.0
     with:
       path: |
-        $GITHUB_WORKSPACE/josm/core/dist/josm-custom.jar
+        josm/core/dist/josm-custom.jar
       key: josm-r${{ inputs.josm-revision }}
   - name: Restore JOSM tests cache
     id: cache-josm-tests
@@ -69,9 +69,9 @@ runs:
     with:
       key: ${{ runner.os }}-${{ github.sha }}
       path: |
-        $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}.jar
-        $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-javadoc.jar
-        $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-sources.jar
+        josm/dist/${{ github.event.repository.name }}.jar
+        josm/dist/${{ github.event.repository.name }}-javadoc.jar
+        josm/dist/${{ github.event.repository.name }}-sources.jar
 
   - name: Get ivy dependencies
     run: |
