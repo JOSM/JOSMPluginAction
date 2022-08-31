@@ -49,7 +49,18 @@ jobs:
           ~/.ivy2/cache/
           $GITHUB_WORKSPACE/josm/core/tools/
         key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
+    - name: Cache build
+      id: cache-plugin-build
+      uses: actions/cache@v3.0.0
+      with:
+        key: ${{ runner.os }}-${{ github.sha }}
+        path: |
+          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}.jar
+          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-javadoc.jar
+          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-sources.jar
+
     - name: Build with Ant
+      if: steps.cache-plugin-build.outputs.cache-hit != 'true'
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
         if [ $GITHUB_REF_TYPE == "tag" ]; then
@@ -58,17 +69,10 @@ jobs:
           version="$GITHUB_REF_NAME-$GITHUB_SHA"
         fi
         ant -noinput -buildfile build.xml -Dplugin.version=$version
-    - uses: actions/upload-artifact@v3
-      with:
-        name: josm-plugin-dist
-        path: |
-          josm/dist/${{ github.event.repository.name }}.jar
-          josm/dist/${{ github.event.repository.name }}-javadoc.jar
-          josm/dist/${{ github.event.repository.name }}-sources.jar
 
   plugin-test:
     runs-on: ubuntu-latest
-    needs: josm-build
+    needs: plugin-build
     steps:
     - name: Set up JDK ${{ inputs.java-version }}
       uses: actions/setup-java@v3
@@ -84,6 +88,16 @@ jobs:
           ~/.ivy2/cache/
           $GITHUB_WORKSPACE/josm/core/tools/
         key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
+
+    - name: Cache build
+      id: cache-plugin-build
+      uses: actions/cache@v3.0.0
+      with:
+        key: ${{ runner.os }}-${{ github.sh }}
+        path: |
+          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}.jar
+          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-javadoc.jar
+          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-sources.jar
 
     - uses: actions/download-artifact@v3
       with:
@@ -101,18 +115,10 @@ jobs:
           curl -o tools/${{ env.ANT_HOME }}-bin.tar.gz https://downloads.apache.org/ant/binaries/${{ env.ANT_HOME }}-bin.tar.gz
         fi
         tar zxf tools/${{ env.ANT_HOME }}-bin.tar.gz
+
     - name: Ant diagnostics
       run: ${{ env.ANT_HOME }}/bin/ant -diagnostics
 
-    - name: Build with Ant
-      run: |
-        cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
-        if [ $GITHUB_REF_TYPE == "tag" ]; then
-          version=$GITHUB_REF_NAME
-        else
-          version="$GITHUB_REF_NAME-$GITHUB_SHA"
-        fi
-        "$GITHUB_WORKSPACE/${{ env.ANT_HOME }}"/bin/ant -noinput -buildfile build.xml -Dplugin.version=$version
     - name: Test with Ant
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
