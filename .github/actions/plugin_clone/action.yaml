@@ -1,5 +1,17 @@
 name: "Plugin clone"
 description: "Clone the plugin into the appropriate directories"
+inputs:
+  josm-revision:
+    type: string
+  josm-test-revision:
+    type: string
+  java-version:
+    type: number
+    default: 8
+  java-distribution:
+    type: string
+    default: "temurin"
+
 outputs:
   plugin-directory:
     value: $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
@@ -7,6 +19,12 @@ outputs:
 runs:
   using: "composite"
   steps:
+  - name: Set up JDK ${{ inputs.java-version }}
+    uses: actions/setup-java@v3
+    with:
+      java-version: ${{ inputs.java-version }}
+      distribution: ${{ inputs.java-distribution }}
+
   - name: Clone JOSM
     run: |
       svn co --depth=immediates https://josm.openstreetmap.de/osmsvn/applications/editors/josm $GITHUB_WORKSPACE/josm
@@ -30,11 +48,38 @@ runs:
         ~/.ivy2/cache/
         $GITHUB_WORKSPACE/josm/core/tools/
       key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
-  - uses: actions/download-artifact@v3
+  - name: Restore JOSM cache
+    id: cache-josm
+    uses: actions/cache@v3.0.0
     with:
-      name: josm-dist
-      path: josm/core/dist
-  - name: Get dependencies
+      path: |
+        $GITHUB_WORKSPACE/josm/core/dist/josm-custom.jar
+      key: josm-r${{ inputs.josm-revision }}
+  - name: Restore JOSM tests cache
+    id: cache-josm-tests
+    uses: actions/cache@v3.0.0
+    with:
+      path: |
+        josm/core/test/build
+      key: josm-r${{ inputs.josm-test-revision }}
+
+  - name: Cache build
+    id: cache-plugin-build
+    uses: actions/cache@v3.0.0
+    with:
+      key: ${{ runner.os }}-${{ github.sha }}
+      path: |
+        $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}.jar
+        $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-javadoc.jar
+        $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-sources.jar
+
+  - name: Get ivy dependencies
+    run: |
+      cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
+      ant fetch_dependencies
+    shell: bash
+
+  - name: Get plugin dependencies
     run: |
       cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
       DEPENDENCIES=""

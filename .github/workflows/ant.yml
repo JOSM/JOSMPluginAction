@@ -6,7 +6,7 @@ on:
       josm-revision:
         type: string
         default: ''
-      operating_system:
+      operating-system:
         type: string
         default: ubuntu-latest
       java-version:
@@ -22,7 +22,10 @@ env:
 
 jobs:
   josm-build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.operating-system }}
+    outputs:
+      josm-revision: ${{ steps.josm-build.outputs.josm-revision }}
+      josm-test-revision: ${{ steps.josm-build.outputs.josm-test-revision }}
     steps:
     - id: josm-build
       uses: tsmock/JOSMPluginAction/.github/actions/josm_build@main
@@ -32,35 +35,17 @@ jobs:
         java-distribution: ${{ inputs.java-distribution }}
 
   plugin-build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.operating-system }}
     needs: josm-build
     steps:
-    - name: Set up JDK ${{ inputs.java-version }}
-      if: steps.cache-josm.outputs.cache-hit != 'true'
-      uses: actions/setup-java@v3
-      with:
-        java-version: ${{ inputs.java-version }}
-        distribution: ${{ inputs.java-distribution }}
     - uses: tsmock/JOSMPluginAction/.github/actions/plugin_clone@main
-    - name: Cache dependencies
-      uses: actions/cache@v3.0.0
       with:
-        path: |
-          ~/.ivy2/cache/
-          $GITHUB_WORKSPACE/josm/core/tools/
-        key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
-    - name: Cache build
-      id: cache-plugin-build
-      uses: actions/cache@v3.0.0
-      with:
-        key: ${{ runner.os }}-${{ github.sha }}
-        path: |
-          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}.jar
-          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-javadoc.jar
-          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-sources.jar
+        josm-revision: ${{ inputs.josm-revision }}
+        josm-test-revision: ${{ inputs.josm-test-revision }}
+        java-version: ${{ inputs.java-version }}
+        java-distribution: ${{ inputs.java-distribution }}
 
     - name: Build with Ant
-      if: steps.cache-plugin-build.outputs.cache-hit != 'true'
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
         if [ $GITHUB_REF_TYPE == "tag" ]; then
@@ -71,42 +56,15 @@ jobs:
         ant -noinput -buildfile build.xml -Dplugin.version=$version
 
   plugin-test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.operating-system }}
     needs: plugin-build
     steps:
-    - name: Set up JDK ${{ inputs.java-version }}
-      uses: actions/setup-java@v3
-      with:
-        java-version: ${{ inputs.java-version }}
-        distribution: ${{ inputs.java-distribution }}
-
     - uses: tsmock/JOSMPluginAction/.github/actions/plugin_clone@main
-    - name: Cache dependencies
-      uses: actions/cache@v3.0.0
       with:
-        path: |
-          ~/.ivy2/cache/
-          $GITHUB_WORKSPACE/josm/core/tools/
-        key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
-
-    - name: Cache build
-      id: cache-plugin-build
-      uses: actions/cache@v3.0.0
-      with:
-        key: ${{ runner.os }}-${{ github.sh }}
-        path: |
-          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}.jar
-          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-javadoc.jar
-          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-sources.jar
-
-    - uses: actions/download-artifact@v3
-      with:
-        name: josm-dist
-        path: josm/core/dist
-    - uses: actions/download-artifact@v3
-      with:
-        name: josm-test
-        path: josm/core/test/build
+        josm-revision: ${{ inputs.josm-revision }}
+        josm-test-revision: ${{ inputs.josm-test-revision }}
+        java-version: ${{ inputs.java-version }}
+        java-distribution: ${{ inputs.java-distribution }}
 
     - name: Install Ant ${{ env.ANT_HOME }}
       run: |
@@ -144,13 +102,18 @@ jobs:
         report_paths: 'josm/plugins/${{ github.event.repository.name }}/test/report/TEST*.xml'
 
   release:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.operating-system }}
     needs: [plugin-build, plugin-test]
     steps:
-    - uses: actions/download-artifact@v3
+    - name: Get build
+      id: cache-plugin-build
+      uses: actions/cache@v3.0.0
       with:
-        name: josm-plugin-dist
-        path: josm/dist
+        key: ${{ runner.os }}-${{ github.sha }}
+        path: |
+          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}.jar
+          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-javadoc.jar
+          $GITHUB_WORKSPACE/josm/dist/${{ github.event.repository.name }}-sources.jar
     - name: Release
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')

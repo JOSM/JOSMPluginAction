@@ -79,8 +79,3 @@ runs:
       java-version: ${{ inputs.java-version }}
       java-distribution: ${{ inputs.java-distribution }}
 
-  - uses: actions/upload-artifact@v3
-    with:
-      name: josm-dist
-      path: josm/core/dist/josm-custom.jar
-
