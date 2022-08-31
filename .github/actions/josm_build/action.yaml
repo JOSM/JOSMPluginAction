@@ -74,7 +74,7 @@ runs:
       ant dist
 
   - id: josm-tests-build
-    uses: tsmock/JOSMPluginAction/.github/actions/josm_tests_build
+    uses: tsmock/JOSMPluginAction/.github/actions/josm_tests_build@main
     with:
       java_version: ${{ inputs.java_version }}
       java_distribution: ${{ inputs.java_distribution }}
