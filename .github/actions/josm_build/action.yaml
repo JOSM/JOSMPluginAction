@@ -4,10 +4,10 @@ inputs:
   josm-revision:
     type: string
     default: ''
-  java_version:
+  java-version:
     type: number
     default: 8
-  java_distribution:
+  java-distribution:
     type: string
     default: temurin
 outputs:
@@ -42,12 +42,12 @@ runs:
         josm/core/dist/josm-custom.jar
       key: josm-r${{ steps.josm-revision.outputs.josm-revision }}
 
-  - name: Set up JDK ${{ inputs.java_version }}
+  - name: Set up JDK ${{ inputs.java-version }}
     if: steps.cache-josm.outputs.cache-hit != 'true'
     uses: actions/setup-java@v3
     with:
-      java-version: ${{ inputs.java_version }}
-      distribution: ${{ inputs.java_distribution }}
+      java-version: ${{ inputs.java-version }}
+      distribution: ${{ inputs.java-distribution }}
 
   - name: Clone JOSM
     if: steps.cache-josm.outputs.cache-hit != 'true'
@@ -76,8 +76,8 @@ runs:
   - id: josm-tests-build
     uses: tsmock/JOSMPluginAction/.github/actions/josm_tests_build@main
     with:
-      java_version: ${{ inputs.java_version }}
-      java_distribution: ${{ inputs.java_distribution }}
+      java-version: ${{ inputs.java-version }}
+      java-distribution: ${{ inputs.java-distribution }}
 
   - uses: actions/upload-artifact@v3
     with:

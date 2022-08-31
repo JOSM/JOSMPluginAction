@@ -4,10 +4,10 @@ inputs:
   josm-revision:
     type: string
     default: ''
-  java_version:
+  java-version:
     type: number
     default: 8
-  java_distribution:
+  java-distribution:
     type: string
     default: temurin
 outputs:
@@ -40,12 +40,12 @@ runs:
         josm/core/test/build
       key: josm-r${{ steps.josm-revision.outputs.josm-revision }}
 
-  - name: Set up JDK ${{ inputs.java_version }}
+  - name: Set up JDK ${{ inputs.java-version }}
     if: steps.cache-josm.outputs.cache-hit != 'true'
     uses: actions/setup-java@v3
     with:
-      java-version: ${{ inputs.java_version }}
-      distribution: ${{ inputs.java_distribution }}
+      java-version: ${{ inputs.java-version }}
+      distribution: ${{ inputs.java-distribution }}
 
   - name: Clone JOSM
     if: steps.cache-josm-tests.outputs.cache-hit != 'true'

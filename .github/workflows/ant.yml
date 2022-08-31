@@ -3,16 +3,16 @@ name: Java CI
 on:
   workflow_call:
     inputs:
-      josm_revision:
+      josm-revision:
         type: string
         default: ''
       operating_system:
         type: string
         default: ubuntu-latest
-      java_version:
+      java-version:
         type: number
         default: 8
-      java_distribution:
+      java-distribution:
         type: string
         default: temurin
 
@@ -27,21 +27,21 @@ jobs:
     - id: josm-build
       uses: tsmock/JOSMPluginAction/.github/actions/josm_build@main
       with:
-        josm_revision: ${{ inputs.josm_revision }}
-        java-version: ${{ inputs.java_version }}
-        distribution: ${{ inputs.java_distribution }}
+        josm-revision: ${{ inputs.josm-revision }}
+        java-version: ${{ inputs.java-version }}
+        distribution: ${{ inputs.java-distribution }}
 
   plugin-build:
     runs-on: ubuntu-latest
     needs: josm-build
     steps:
     - uses: tsmock/JOSMPluginAction/.github/actions/josm_build@main
-    - name: Set up JDK ${{ inputs.java_version }}
+    - name: Set up JDK ${{ inputs.java-version }}
       if: steps.cache-josm.outputs.cache-hit != 'true'
       uses: actions/setup-java@v3
       with:
-        java-version: ${{ inputs.java_version }}
-        distribution: ${{ inputs.java_distribution }}
+        java-version: ${{ inputs.java-version }}
+        distribution: ${{ inputs.java-distribution }}
     - uses: tsmock/JOSMPluginAction/.github/actions/plugin_clone@main
     - name: Build with Ant
       run: |
@@ -64,11 +64,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: josm-build
     steps:
-    - name: Set up JDK ${{ inputs.java_version }}
+    - name: Set up JDK ${{ inputs.java-version }}
       uses: actions/setup-java@v3
       with:
-        java-version: ${{ inputs.java_version }}
-        distribution: ${{ inputs.java_distribution }}
+        java-version: ${{ inputs.java-version }}
+        distribution: ${{ inputs.java-distribution }}
 
     - uses: tsmock/JOSMPluginAction/.github/actions/plugin_clone@main
 
