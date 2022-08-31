@@ -38,7 +38,7 @@ runs:
     with:
       path: |
         josm/core/test/build
-      key: josm-r${{ steps.josm-revision.outputs.josm-revision }}
+      key: josm-tests-r${{ steps.josm-revision.outputs.josm-revision }}
 
   - name: Set up JDK ${{ inputs.java-version }}
     if: steps.cache-josm.outputs.cache-hit != 'true'

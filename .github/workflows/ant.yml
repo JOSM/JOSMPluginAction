@@ -30,9 +30,9 @@ jobs:
     - id: josm-build
       uses: tsmock/JOSMPluginAction/.github/actions/josm_build@main
       with:
-        josm-revision: ${{ inputs.josm-revision }}
-        java-version: ${{ inputs.java-version }}
         java-distribution: ${{ inputs.java-distribution }}
+        java-version: ${{ inputs.java-version }}
+        josm-revision: ${{ inputs.josm-revision }}
 
   plugin-build:
     runs-on: ${{ inputs.operating-system }}
@@ -40,10 +40,10 @@ jobs:
     steps:
     - uses: tsmock/JOSMPluginAction/.github/actions/plugin_clone@main
       with:
-        josm-revision: ${{ needs.josm-build.outputs.josm-revision }}
-        josm-test-revision: ${{ inputs.josm-test-revision }}
-        java-version: ${{ inputs.java-version }}
         java-distribution: ${{ inputs.java-distribution }}
+        java-version: ${{ inputs.java-version }}
+        josm-revision: ${{ needs.josm-build.outputs.josm-revision }}
+        josm-test-revision: ${{ needs.josm-build.outputs.josm-test-revision }}
 
     - name: Build with Ant
       run: |
@@ -61,10 +61,10 @@ jobs:
     steps:
     - uses: tsmock/JOSMPluginAction/.github/actions/plugin_clone@main
       with:
-        josm-revision: ${{ needs.josm-build.outputs.josm-revision }}
-        josm-test-revision: ${{ inputs.josm-test-revision }}
-        java-version: ${{ inputs.java-version }}
         java-distribution: ${{ inputs.java-distribution }}
+        java-version: ${{ inputs.java-version }}
+        josm-revision: ${{ needs.josm-build.outputs.josm-revision }}
+        josm-test-revision: ${{ needs.josm-build.outputs.josm-test-revision }}
 
     - name: Install Ant ${{ env.ANT_HOME }}
       run: |

@@ -61,7 +61,7 @@ runs:
     with:
       path: |
         josm/core/test/build
-      key: josm-r${{ inputs.josm-test-revision }}
+      key: josm-tests-r${{ inputs.josm-test-revision }}
 
   - name: Cache build
     id: cache-plugin-build
