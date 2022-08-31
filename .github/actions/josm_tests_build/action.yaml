@@ -12,7 +12,6 @@ inputs:
     default: temurin
 outputs:
   josm-revision:
-    type: string
     value: ${{ steps.josm-revision.outputs.josm-revision }}
 
 runs:
@@ -53,8 +52,9 @@ runs:
     run: |
       svn co --depth=immediates https://josm.openstreetmap.de/osmsvn/applications/editors/josm $GITHUB_WORKSPACE/josm
       cd $GITHUB_WORKSPACE/josm
-      svn up --revision=${{needs.josm-revision.outputs.josm-revision}} --set-depth=infinity --accept=theirs-full core
-      svn propget svn:externals | grep core | xargs -L1 svn co --revision=${{needs.josm-revision.outputs.josm-revision}}
+      svn up --revision=${{steps.josm-revision.outputs.josm-revision}} --set-depth=infinity --accept=theirs-full core
+      svn propget svn:externals | grep core | xargs -L1 svn co --revision=${{steps.josm-revision.outputs.josm-revision}}
+    shell: bash
 
   - name: Cache dependencies
     uses: actions/cache@v3.0.0
@@ -70,6 +70,7 @@ runs:
     run: |
       cd $GITHUB_WORKSPACE/josm/core
       ant test-compile
+    shell: bash
 
   - uses: actions/upload-artifact@v3
     with:
