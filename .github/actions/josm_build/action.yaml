@@ -1,0 +1,86 @@
+name: "JOSM Build"
+description: "Build the appropriate JOSM jar and test files"
+inputs:
+  josm-revision:
+    type: string
+    default: ''
+  java_version:
+    type: number
+    default: 8
+  java_distribution:
+    type: string
+    default: temurin
+outputs:
+  josm-revision:
+    type: string
+    value: ${{ steps.josm-revision.outputs.josm-revision }}
+  josm-test-revision:
+    type: string
+    value: ${{ steps.josm-tests-build.outputs.josm-revision }}
+
+runs:
+  using: "composite"
+  steps:
+  - name: Get JOSM revision
+    id: josm-revision
+    run: |
+      REVISION=${{ inputs.revision }}
+      if [ -z "${REVISION}" ]; then
+        REVISION=$(svn info https://josm.openstreetmap.de/svn/trunk | grep Revision | awk '{print $2}')
+      elif [ "tested" == "${REVISION}" ]; then
+        REVISION=$(curl https://josm.openstreetmap.de/tested)
+      elif [ "latest" == "${REVISION}" ]; then
+        REVISION=$(curl https://josm.openstreetmap.de/latest)
+      fi
+      echo $REVISION
+      echo "::set-output name=josm-revision::${REVISION}"
+    shell: bash
+
+  - name: Cache JOSM
+    id: cache-josm
+    uses: actions/cache@v3.0.0
+    with:
+      path: |
+        josm/core/dist/josm-custom.jar
+      key: josm-r${{ steps.josm-revision.outputs.josm-revision }}
+
+  - name: Set up JDK ${{ inputs.java_version }}
+    if: steps.cache-josm.outputs.cache-hit != 'true'
+    uses: actions/setup-java@v3
+    with:
+      java-version: ${{ inputs.java_version }}
+      distribution: ${{ inputs.java_distribution }}
+
+  - name: Clone JOSM
+    if: steps.cache-josm.outputs.cache-hit != 'true'
+    run: |
+      svn co --depth=immediates https://josm.openstreetmap.de/osmsvn/applications/editors/josm $GITHUB_WORKSPACE/josm
+      cd $GITHUB_WORKSPACE/josm
+      svn up --revision=${{needs.josm-revision.outputs.josm-revision}} --set-depth=infinity --accept=theirs-full core
+      svn propget svn:externals | grep core | xargs -L1 svn co --revision=${{needs.josm-revision.outputs.josm-revision}}
+
+  - name: Cache dependencies
+    uses: actions/cache@v3.0.0
+    if: steps.cache-josm.outputs.cache-hit != 'true'
+    with:
+      path: |
+        ~/.ivy2/cache/
+        $GITHUB_WORKSPACE/josm/core/tools/
+      key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
+  - name: build JOSM
+    if: steps.cache-josm.outputs.cache-hit != 'true'
+    run: |
+      cd $GITHUB_WORKSPACE/josm/core
+      ant dist
+
+  - id: josm-tests-build
+    uses: ./.github/actions/josm_tests_build
+    with:
+      java_version: ${{ inputs.java_version }}
+      java_distribution: ${{ inputs.java_distribution }}
+
+  - uses: actions/upload-artifact@v3
+    with:
+      name: josm-dist
+      path: josm/core/dist/josm-custom.jar
+

@@ -3,7 +3,7 @@ name: Java CI
 on:
   workflow_call:
     inputs:
-      revision:
+      josm_revision:
         type: string
         default: ''
       operating_system:
@@ -21,123 +21,28 @@ env:
   ANT_HOME: 'apache-ant-1.10.12'
 
 jobs:
-  josm-revision:
-    runs-on: ubuntu-latest
-    outputs:
-      josm-revision: ${{ steps.josm-revision.outputs.josm-revision }}
-    steps:
-    - name: Get JOSM revision
-      id: josm-revision
-      run: |
-        REVISION=${{ inputs.revision }}
-        if [ -z "${REVISION}" ]; then
-          REVISION=$(svn info https://josm.openstreetmap.de/svn/trunk | grep Revision | awk '{print $2}')
-        elif [ "tested" == "${REVISION}" ]; then
-          REVISION=$(curl https://josm.openstreetmap.de/tested)
-        elif [ "latest" == "${REVISION}" ]; then
-          REVISION=$(curl https://josm.openstreetmap.de/latest)
-        fi
-        echo $REVISION
-        echo "::set-output name=josm-revision::${REVISION}"
-      shell: bash
-
   josm-build:
-    runs-on: ${{ inputs.operating_system }}
-    needs: josm-revision
+    runs-on: ubuntu-latest
     steps:
-    - name: Cache JOSM
-      id: cache-josm
-      uses: actions/cache@v3.0.0
+    - id: josm-build
+      uses: ./.github/actions/josm_build
       with:
-        path: |
-          josm/core/dist/josm-custom.jar
-          josm/core/test/build
-        key: josm-r${{ needs.josm-revision.outputs.josm-revision }}
-    - name: Set up JDK ${{ inputs.java_version }}
-      if: steps.cache-josm.outputs.cache-hit != 'true'
-      uses: actions/setup-java@v3
-      with:
+        josm_revision: ${{ inputs.josm_revision }}
         java-version: ${{ inputs.java_version }}
         distribution: ${{ inputs.java_distribution }}
-    - name: Clone JOSM
-      if: steps.cache-josm.outputs.cache-hit != 'true'
-      run: |
-        svn co --depth=immediates https://josm.openstreetmap.de/osmsvn/applications/editors/josm $GITHUB_WORKSPACE/josm
-        cd $GITHUB_WORKSPACE/josm
-        svn up --revision=${{needs.josm-revision.outputs.josm-revision}} --set-depth=infinity --accept=theirs-full core
-        svn propget svn:externals | grep core | xargs -L1 svn co --revision=${{needs.josm-revision.outputs.josm-revision}}
-    - name: Cache dependencies
-      uses: actions/cache@v3.0.0
-      if: steps.cache-josm.outputs.cache-hit != 'true'
-      with:
-        path: |
-          ~/.ivy2/cache/
-          $GITHUB_WORKSPACE/josm/core/tools/
-        key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
-    - name: build JOSM
-      if: steps.cache-josm.outputs.cache-hit != 'true'
-      run: |
-        cd $GITHUB_WORKSPACE/josm/core
-        ant dist test-compile
-    - uses: actions/upload-artifact@v3
-      with:
-        name: josm-dist
-        path: josm/core/dist/josm-custom.jar
-    - uses: actions/upload-artifact@v3
-      with:
-        name: josm-test
-        path: josm/core/test/build
+
   plugin-build:
     runs-on: ubuntu-latest
-    needs: [josm-revision, josm-build]
+    needs: josm-build
     steps:
+    - uses: ./.github/actions/josm_build
     - name: Set up JDK ${{ inputs.java_version }}
       if: steps.cache-josm.outputs.cache-hit != 'true'
       uses: actions/setup-java@v3
       with:
         java-version: ${{ inputs.java_version }}
         distribution: ${{ inputs.java_distribution }}
-    - name: Clone JOSM
-      run: |
-        svn co --depth=immediates https://josm.openstreetmap.de/osmsvn/applications/editors/josm $GITHUB_WORKSPACE/josm
-        cd $GITHUB_WORKSPACE/josm
-        svn up --set-depth=immediates --revision=${{needs.josm-revision.outputs.josm-revision}} core
-        svn up --set-depth=immediates plugins
-        svn up --set-depth=infinity --accept=theirs-full i18n plugins/{00_core_test_config,00_core_test_lib,00_core_tools,00_tools}
-        svn propget svn:externals | grep core | xargs -L1 svn co --depth=empty
-        cd core
-        svn up --revision=${{needs.josm-revision.outputs.josm-revision}} ivy.xml ivysettings.xml
-        cd ../plugins
-        svn propget svn:externals | grep 00_core | xargs -L1 svn co --revision=${{needs.josm-revision.outputs.josm-revision}}
-    - uses: actions/checkout@v3
-      with:
-        path: josm/plugins/${{ github.event.repository.name }}
-    - name: Cache
-      uses: actions/cache@v3.0.0
-      with:
-        path: |
-          ~/.ivy2/cache/
-          $GITHUB_WORKSPACE/josm/core/tools/
-        key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
-    - uses: actions/download-artifact@v3
-      with:
-        name: josm-dist
-        path: josm/core/dist
-    - name: Get dependencies
-      run: |
-        cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
-        DEPENDENCIES=""
-        if [ -f "gradle.properties" ]; then
-          DEPENDENCIES="$(cat gradle.properties | grep 'plugin.requires' | awk -F'=' '{print $2}')"
-        fi
-        if [ -z "${DEPENDENCIES}" ] && [ -f "build.xml" ]; then
-          DEPENDENCIES="$(cat build.xml | grep 'plugin.requires' | awk -F'\"' '{print $4}')"
-        fi
-        DEPENDENCIES=$(echo $DEPENDENCIES | tr ";" "\n")
-        cd $GITHUB_WORKSPACE/josm/dist
-        for dependency in $DEPENDENCIES; do
-          svn up $dependency.jar
-        done
+    - uses: ./.github/actions/plugin_clone
     - name: Build with Ant
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
@@ -154,36 +59,27 @@ jobs:
           josm/dist/${{ github.event.repository.name }}.jar
           josm/dist/${{ github.event.repository.name }}-javadoc.jar
           josm/dist/${{ github.event.repository.name }}-sources.jar
+
   plugin-test:
     runs-on: ubuntu-latest
     needs: josm-build
     steps:
-    - name: Set up JDK 8
+    - name: Set up JDK ${{ inputs.java_version }}
       uses: actions/setup-java@v3
       with:
-        java-version: '8'
-        distribution: 'temurin'
-    - name: Clone JOSM
-      run: |
-        svn co --depth=immediates https://josm.openstreetmap.de/osmsvn/applications/editors/josm $GITHUB_WORKSPACE/josm
-        cd $GITHUB_WORKSPACE/josm
-        svn up --set-depth=immediates core plugins
-        svn up --set-depth=infinity --accept=theirs-full i18n plugins/{00_core_test_config,00_core_test_lib,00_core_tools,00_tools}
-        svn propget svn:externals | grep core | xargs -L1 svn co --depth=empty
-        cd core
-        svn up ivy.xml ivysettings.xml
-        cd ../plugins
-        svn propget svn:externals | grep 00_core | xargs -L1 svn co
-    - uses: actions/checkout@v3
+        java-version: ${{ inputs.java_version }}
+        distribution: ${{ inputs.java_distribution }}
+
+    - uses: ./.github/actions/plugin_clone
+
+    - uses: actions/download-artifact@v3
       with:
-        path: josm/plugins/${{ github.event.repository.name }}
-    - name: Cache
-      uses: actions/cache@v3.0.0
+        name: josm-dist
+        path: josm/core/dist
+    - uses: actions/download-artifact@v3
       with:
-        path: |
-          ~/.ivy2/cache/
-          $GITHUB_WORKSPACE/josm/core/tools/
-        key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}-plugin-test
+        name: josm-test
+        path: josm/core/test/build
 
     - name: Install Ant ${{ env.ANT_HOME }}
       run: |
@@ -195,29 +91,6 @@ jobs:
     - name: Ant diagnostics
       run: ${{ env.ANT_HOME }}/bin/ant -diagnostics
 
-    - uses: actions/download-artifact@v3
-      with:
-        name: josm-dist
-        path: josm/core/dist
-    - uses: actions/download-artifact@v3
-      with:
-        name: josm-test
-        path: josm/core/test/build
-    - name: Get dependencies
-      run: |
-        cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
-        DEPENDENCIES=""
-        if [ -f "gradle.properties" ]; then
-          DEPENDENCIES="$(cat gradle.properties | grep 'plugin.requires' | awk -F'=' '{print $2}')"
-        fi
-        if [ -z "${DEPENDENCIES}" ] && [ -f "build.xml" ]; then
-          DEPENDENCIES="$(cat build.xml | grep 'plugin.requires' | awk -F'\"' '{print $4}')"
-        fi
-        DEPENDENCIES=$(echo $DEPENDENCIES | tr ";" "\n")
-        cd $GITHUB_WORKSPACE/josm/dist
-        for dependency in $DEPENDENCIES; do
-          svn up $dependency.jar
-        done
     - name: Build with Ant
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
@@ -250,6 +123,7 @@ jobs:
       if: always() # always run even if the previous step fails
       with:
         report_paths: 'josm/plugins/${{ github.event.repository.name }}/test/report/TEST*.xml'
+
   release:
     runs-on: ubuntu-latest
     needs: [plugin-build, plugin-test]

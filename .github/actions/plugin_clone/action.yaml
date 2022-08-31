@@ -1,0 +1,51 @@
+name: "Plugin clone"
+description: "Clone the plugin into the appropriate directories"
+outputs:
+  plugin-directory:
+    type: string
+    value: $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
+
+runs:
+  using: "composite"
+  steps:
+  - name: Clone JOSM
+    run: |
+      svn co --depth=immediates https://josm.openstreetmap.de/osmsvn/applications/editors/josm $GITHUB_WORKSPACE/josm
+      cd $GITHUB_WORKSPACE/josm
+      svn up --set-depth=immediates core
+      svn up --set-depth=immediates plugins
+      svn up --set-depth=infinity --accept=theirs-full i18n plugins/{00_core_test_config,00_core_test_lib,00_core_tools,00_tools}
+      svn propget svn:externals | grep core | xargs -L1 svn co --depth=empty
+      cd core
+      svn up ivy.xml ivysettings.xml
+      cd ../plugins
+      svn propget svn:externals | grep 00_core | xargs -L1 svn co
+  - uses: actions/checkout@v3
+    with:
+      path: josm/plugins/${{ github.event.repository.name }}
+  - name: Cache
+    uses: actions/cache@v3.0.0
+    with:
+      path: |
+        ~/.ivy2/cache/
+        $GITHUB_WORKSPACE/josm/core/tools/
+      key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
+  - uses: actions/download-artifact@v3
+    with:
+      name: josm-dist
+      path: josm/core/dist
+  - name: Get dependencies
+    run: |
+      cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
+      DEPENDENCIES=""
+      if [ -f "gradle.properties" ]; then
+        DEPENDENCIES="$(cat gradle.properties | grep 'plugin.requires' | awk -F'=' '{print $2}')"
+      fi
+      if [ -z "${DEPENDENCIES}" ] && [ -f "build.xml" ]; then
+        DEPENDENCIES="$(cat build.xml | grep 'plugin.requires' | awk -F'\"' '{print $4}')"
+      fi
+      DEPENDENCIES=$(echo $DEPENDENCIES | tr ";" "\n")
+      cd $GITHUB_WORKSPACE/josm/dist
+      for dependency in $DEPENDENCIES; do
+        svn up $dependency.jar
+      done
