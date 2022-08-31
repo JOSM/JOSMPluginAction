@@ -123,6 +123,21 @@ jobs:
       with:
         name: josm-dist
         path: josm/core/dist
+    - name: Get dependencies
+      run: |
+        cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
+        DEPENDENCIES=""
+        if [ -f "gradle.properties" ]; then
+          DEPENDENCIES="$(cat gradle.properties | grep 'plugin.requires' | awk -F'=' '{print $2}')"
+        fi
+        if [ -z "${DEPENDENCIES}" ] && [ -f "build.xml" ]; then
+          DEPENDENCIES="$(cat build.xml | grep 'plugin.requires' | awk -F'\"' '{print $4}')"
+        fi
+        DEPENDENCIES=$(echo $DEPENDENCIES | tr ";" "\n")
+        cd $GITHUB_WORKSPACE/josm/dist
+        for dependency in $DEPENDENCIES; do
+          svn up $dependency.jar
+        done
     - name: Build with Ant
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
@@ -188,6 +203,21 @@ jobs:
       with:
         name: josm-test
         path: josm/core/test/build
+    - name: Get dependencies
+      run: |
+        cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
+        DEPENDENCIES=""
+        if [ -f "gradle.properties" ]; then
+          DEPENDENCIES="$(cat gradle.properties | grep 'plugin.requires' | awk -F'=' '{print $2}')"
+        fi
+        if [ -z "${DEPENDENCIES}" ] && [ -f "build.xml" ]; then
+          DEPENDENCIES="$(cat build.xml | grep 'plugin.requires' | awk -F'\"' '{print $4}')"
+        fi
+        DEPENDENCIES=$(echo $DEPENDENCIES | tr ";" "\n")
+        cd $GITHUB_WORKSPACE/josm/dist
+        for dependency in $DEPENDENCIES; do
+          svn up $dependency.jar
+        done
     - name: Build with Ant
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
