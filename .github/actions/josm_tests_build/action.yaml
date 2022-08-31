@@ -45,7 +45,7 @@ runs:
     uses: actions/setup-java@v3
     with:
       java-version: ${{ inputs.java-version }}
-      distribution: ${{ inputs.java-distribution }}
+      java-distribution: ${{ inputs.java-distribution }}
 
   - name: Clone JOSM
     if: steps.cache-josm-tests.outputs.cache-hit != 'true'
