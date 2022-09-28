@@ -17,7 +17,7 @@ runs:
     with:
       path: |
         josm/tools/apache-ant-${{ inputs.ant-version }}
-      key: apache-ant-2-${{ inputs.ant-version }}
+      key: apache-ant-3-${{ inputs.ant-version }}
 
   - name: Set ANT_HOME
     id: set-ant-home
@@ -30,7 +30,7 @@ runs:
 
   - name: Install Ant ${{ inputs.ant-version }}
     id: install-ant
-    if: steps.cache-ant.outputs.cache-hit != 'true'
+    if: steps.cache-ant.outputs.cache-hit != 'true3'
     run: |
       if [ ! -d josm/tools ]; then mkdir -p josm/tools; fi
       if [ ! -f josm/tools/${{ env.ANT_HOME }}-bin.tar.gz ]; then
