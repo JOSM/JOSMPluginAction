@@ -72,6 +72,7 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
         "$GITHUB_WORKSPACE/${{ env.ANT_HOME }}"/bin/ant -noinput -buildfile build.xml -Dplugin.version=$version -Dtest.headless=true test
+        find test/report -iname '*.txt' -type f -empty -delete -print
         exit $(grep -L ', Failures: 0, Skipped: ' test/report/*.txt | wc -l)
     - name: Dump errors if failed
       if: ${{ failure() }}
