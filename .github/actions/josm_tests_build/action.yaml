@@ -65,6 +65,8 @@ runs:
         josm/core/tools/
       key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
 
+  - uses: tsmock/JOSMPluginAction/.github/actions/setup-ant@main
+
   - name: build JOSM tests
     if: steps.cache-josm-tests.outputs.cache-hit != 'true'
     run: |

@@ -38,6 +38,7 @@ jobs:
     runs-on: ${{ inputs.operating-system }}
     needs: josm-build
     steps:
+    - uses: tsmock/JOSMPluginAction/.github/actions/setup-ant@main
     - uses: tsmock/JOSMPluginAction/.github/actions/plugin_clone@main
       with:
         java-distribution: ${{ inputs.java-distribution }}
@@ -59,23 +60,13 @@ jobs:
     runs-on: ${{ inputs.operating-system }}
     needs: [josm-build, plugin-build]
     steps:
+    - uses: tsmock/JOSMPluginAction/.github/actions/setup-ant@main
     - uses: tsmock/JOSMPluginAction/.github/actions/plugin_clone@main
       with:
         java-distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
         josm-revision: ${{ needs.josm-build.outputs.josm-revision }}
         josm-test-revision: ${{ needs.josm-build.outputs.josm-test-revision }}
-
-    - name: Install Ant ${{ env.ANT_HOME }}
-      run: |
-        if [ ! -d tools ]; then mkdir tools; fi
-        if [ ! -f tools/${{ env.ANT_HOME }}-bin.tar.gz ]; then
-          curl -o tools/${{ env.ANT_HOME }}-bin.tar.gz https://downloads.apache.org/ant/binaries/${{ env.ANT_HOME }}-bin.tar.gz
-        fi
-        tar zxf tools/${{ env.ANT_HOME }}-bin.tar.gz
-
-    - name: Ant diagnostics
-      run: ${{ env.ANT_HOME }}/bin/ant -diagnostics
 
     - name: Test with Ant
       run: |
