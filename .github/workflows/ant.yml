@@ -69,29 +69,38 @@ jobs:
         josm-test-revision: ${{ needs.josm-build.outputs.josm-test-revision }}
 
     - name: Test with Ant
+      id: ant-test
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
+        if [ -d "test" ]; then TEST_REPORT_PATH="test/report"; elif [ -d "src/test" ]; then TEST_REPORT_PATH="src/test/report"; else exit -1; fi
+        echo "TEST_REPORT_PATH=${TEST_REPORT_PATH}" >> $GITHUB_ENV
+
         "$GITHUB_WORKSPACE/${{ env.ANT_HOME }}"/bin/ant -noinput -buildfile build.xml -Dplugin.version=$version -Dtest.headless=true test
-        find test/report -iname '*.txt' -type f -empty -delete -print
-        exit $(grep -L ', Failures: 0, Skipped: ' test/report/*.txt | wc -l)
+
+        find "${TEST_REPORT_PATH}" -iname '*.txt' -type f -empty -delete -print
+        ls "${TEST_REPORT_PATH}" | grep '.txt$'
+        if [ $(ls "${TEST_REPORT_PATH}" | grep '.txt$' | wc -l) -gt 0 ]; then
+          grep -L ', Failures: 0, Skipped: ' "${TEST_REPORT_PATH}"/*.txt
+          exit $(grep -L ', Failures: 0, Skipped: ' "${TEST_REPORT_PATH}"/*.txt | wc -l)
+        fi
     - name: Dump errors if failed
       if: ${{ failure() }}
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
-        grep -L ', Failures: 0, Skipped: ' test/report/*.txt | xargs cat
+        grep -L ', Failures: 0, Skipped: ' "${{ env.TEST_REPORT_PATH }}"/*.txt | xargs cat
     - name: Upload Ant reports
       if: ${{ always() }}
       uses: actions/upload-artifact@v2
       with:
         name: Ant reports for JOSM plugin ${{ github.event.repository.name }}
         path: |
-          josm/plugins/${{ github.event.repository.name }}/test/report/*.txt
-          josm/plugins/${{ github.event.repository.name }}/test/report/TEST*.xml
+          josm/plugins/${{ github.event.repository.name }}/${{ env.TEST_REPORT_PATH }}/*.txt
+          josm/plugins/${{ github.event.repository.name }}/${{ env.TEST_REPORT_PATH }}/TEST*.xml
     - name: Publish Test Report
       uses: mikepenz/action-junit-report@v3
       if: always() # always run even if the previous step fails
       with:
-        report_paths: 'josm/plugins/${{ github.event.repository.name }}/test/report/TEST*.xml'
+        report_paths: 'josm/plugins/${{ github.event.repository.name }}/${{ env.TEST_REPORT_PATH }}/TEST*.xml'
 
   release:
     runs-on: ${{ inputs.operating-system }}
