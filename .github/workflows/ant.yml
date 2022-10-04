@@ -6,15 +6,33 @@ on:
       josm-revision:
         type: string
         default: ''
+        description: The JOSM revision to use. May be empty (''), 'latest', 'tested', or 'rNUMBER' ('r10000')
+        required: false
       operating-system:
         type: string
         default: ubuntu-latest
+        description: The operating system to run on
+        required: false
       java-version:
         type: number
         default: 8
+        description: The java version to build against
+        required: false
       java-distribution:
         type: string
         default: temurin
+        description: The java distribution to build against
+        required: false
+      update-pluginssource:
+        type: boolean
+        default: false
+        required: false
+        description: Update the PluginsSource wiki page with a new URL.
+      plugin-jar-name:
+        type: string
+        default: ''
+        description: "The base name of the jar file, if not the repository name. Only useful in conjunction with `update-pluginssource`."
+        required: false
 
 env:
   # ANT_HOME is also our ant version
@@ -28,7 +46,7 @@ jobs:
       josm-test-revision: ${{ steps.josm-build.outputs.josm-test-revision }}
     steps:
     - id: josm-build
-      uses: tsmock/JOSMPluginAction/.github/actions/josm_build@main
+      uses: JOSM/JOSMPluginAction/.github/actions/josm_build@v1
       with:
         java-distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
@@ -38,8 +56,8 @@ jobs:
     runs-on: ${{ inputs.operating-system }}
     needs: josm-build
     steps:
-    - uses: tsmock/JOSMPluginAction/.github/actions/setup-ant@main
-    - uses: tsmock/JOSMPluginAction/.github/actions/plugin_clone@main
+    - uses: JOSM/JOSMPluginAction/.github/actions/setup-ant@v1
+    - uses: JOSM/JOSMPluginAction/.github/actions/plugin_clone@v1
       with:
         java-distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
@@ -60,8 +78,8 @@ jobs:
     runs-on: ${{ inputs.operating-system }}
     needs: [josm-build, plugin-build]
     steps:
-    - uses: tsmock/JOSMPluginAction/.github/actions/setup-ant@main
-    - uses: tsmock/JOSMPluginAction/.github/actions/plugin_clone@main
+    - uses: JOSM/JOSMPluginAction/.github/actions/setup-ant@v1
+    - uses: JOSM/JOSMPluginAction/.github/actions/plugin_clone@v1
       with:
         java-distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
@@ -123,3 +141,11 @@ jobs:
           josm/dist/${{ github.event.repository.name }}.jar
           josm/dist/${{ github.event.repository.name }}-javadoc.jar
           josm/dist/${{ github.event.repository.name }}-sources.jar
+
+    - name: Update PluginsSource (actually, updating SandBox until we know that there are no problems)
+      uses: JOSM/JOSMPluginAction/.github/actions/update_pluginssource@v1
+      if: ${{ inputs.update-pluginssource }}
+      with:
+        trac-username: ${{ secrets.trac_username }}
+        trac-password: ${{ secrets.trac_password }}
+        plugin-jar-name: ${{ inputs.plugin-jar-name }}
