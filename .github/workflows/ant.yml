@@ -95,17 +95,6 @@ jobs:
 
         "$GITHUB_WORKSPACE/${{ env.ANT_HOME }}"/bin/ant -noinput -buildfile build.xml -Dplugin.version=$version -Dtest.headless=true test
 
-        find "${TEST_REPORT_PATH}" -iname '*.txt' -type f -empty -delete -print
-        ls "${TEST_REPORT_PATH}" | grep '.txt$'
-        if [ $(ls "${TEST_REPORT_PATH}" | grep '.txt$' | wc -l) -gt 0 ]; then
-          grep -L ', Failures: 0, Skipped: ' "${TEST_REPORT_PATH}"/*.txt
-          exit $(grep -L ', Failures: 0, Skipped: ' "${TEST_REPORT_PATH}"/*.txt | wc -l)
-        fi
-    - name: Dump errors if failed
-      if: ${{ failure() }}
-      run: |
-        cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
-        grep -L ', Failures: 0, Skipped: ' "${{ env.TEST_REPORT_PATH }}"/*.txt | xargs cat
     - name: Upload Ant reports
       if: ${{ always() }}
       uses: actions/upload-artifact@v2
@@ -119,6 +108,7 @@ jobs:
       if: always() # always run even if the previous step fails
       with:
         report_paths: 'josm/plugins/${{ github.event.repository.name }}/${{ env.TEST_REPORT_PATH }}/TEST*.xml'
+        fail_on_failure: true
 
   release:
     runs-on: ${{ inputs.operating-system }}
