@@ -136,6 +136,6 @@ jobs:
       uses: JOSM/JOSMPluginAction/.github/actions/update_pluginssource@v1
       if: ${{ inputs.update-pluginssource }}
       with:
-        trac-username: ${{ secrets.trac_username }}
-        trac-password: ${{ secrets.trac_password }}
+        trac-username: ${{ secrets.TRAC_USERNAME }}
+        trac-password: ${{ secrets.TRAC_PASSWORD }}
         plugin-jar-name: ${{ inputs.plugin-jar-name }}
