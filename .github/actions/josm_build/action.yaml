@@ -4,17 +4,25 @@ inputs:
   josm-revision:
     type: string
     default: ''
+    description: JOSM revision to use to build against, '' is current svn head, 'latest' is current latest, 'tested' is current tested, and 'rNUMBER' is for specific revisions
+    required: false
   java-version:
     type: number
     default: 8
+    description: The java version to build JOSM against. This should typically not be changed.
+    required: false
   java-distribution:
     type: string
     default: temurin
+    description: The java distribution to build JOSM against. This should typically not be changed.
+    required: false
 outputs:
   josm-revision:
     value: ${{ steps.josm-revision.outputs.josm-revision }}
+    description: The actual JOSM revision built. Useful for tested, latest, and '' josm-revision inputs.
   josm-test-revision:
     value: ${{ steps.josm-tests-build.outputs.josm-revision }}
+    description: The actual JOSM test revision built. This is almost always the current SVN head.
 
 runs:
   using: "composite"
@@ -22,7 +30,7 @@ runs:
   - name: Get JOSM revision
     id: josm-revision
     run: |
-      REVISION=${{ inputs.revision }}
+      REVISION=${{ inputs.josm-revision }}
       if [ -z "${REVISION}" ]; then
         REVISION=$(svn info https://josm.openstreetmap.de/svn/trunk | grep Revision | awk '{print $2}')
       elif [ "tested" == "${REVISION}" ]; then
@@ -66,7 +74,7 @@ runs:
         ~/.ivy2/cache/
         josm/core/tools/
       key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
-  - uses: tsmock/JOSMPluginAction/.github/actions/setup-ant@main
+  - uses: JOSM/JOSMPluginAction/.github/actions/setup-ant@v1
   - name: build JOSM
     if: steps.cache-josm.outputs.cache-hit != 'true'
     run: |
@@ -75,7 +83,7 @@ runs:
     shell: bash
 
   - id: josm-tests-build
-    uses: tsmock/JOSMPluginAction/.github/actions/josm_tests_build@main
+    uses: JOSM/JOSMPluginAction/.github/actions/josm_tests_build@v1
     with:
       java-version: ${{ inputs.java-version }}
       java-distribution: ${{ inputs.java-distribution }}

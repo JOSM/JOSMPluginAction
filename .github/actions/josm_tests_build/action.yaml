@@ -4,15 +4,22 @@ inputs:
   josm-revision:
     type: string
     default: ''
+    description: JOSM revision to use to build against, '' is current svn head, 'latest' is current latest, 'tested' is current tested, and 'rNUMBER' is for specific revisions
+    required: false
   java-version:
     type: number
     default: 8
+    description: The java version to build JOSM against. This should typically not be changed.
+    required: false
   java-distribution:
     type: string
     default: temurin
+    description: The java distribution to build JOSM against. This should typically not be changed.
+    required: false
 outputs:
   josm-revision:
     value: ${{ steps.josm-revision.outputs.josm-revision }}
+    description: The actual JOSM test revision built.
 
 runs:
   using: "composite"
@@ -65,7 +72,7 @@ runs:
         josm/core/tools/
       key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
 
-  - uses: tsmock/JOSMPluginAction/.github/actions/setup-ant@main
+  - uses: JOSM/JOSMPluginAction/.github/actions/setup-ant@v1
 
   - name: build JOSM tests
     if: steps.cache-josm-tests.outputs.cache-hit != 'true'
