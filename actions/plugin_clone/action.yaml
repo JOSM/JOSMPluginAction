@@ -85,7 +85,7 @@ runs:
         josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
 
   - name: Get ivy dependencies
-    if: hashFiles("josm/plugins/${{ github.event.repository.name }}/ivy.xml") != ''
+    if: hashFiles("josm/plugins/${{ github.event.repository.name }}/ivy.xml") !=
     run: |
       cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
       ant fetch_dependencies
