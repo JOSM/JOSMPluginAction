@@ -54,7 +54,7 @@ function replace_page_text(page_text) {
 function update_page_text(server, page_name, page_text) {
     let repo = github.context.repo;
     return server.json_request({
-        "params": [page_name, page_text, {"comment": repo.owner + '/' + repo.repo + ": Update plugin link"}],
+        "params": ["SandBox"/*TODO Replace with page_name*/, page_text, {"comment": repo.owner + '/' + repo.repo + ": Update plugin link"}],
         "method": "wiki.putPage",
         "id": 1
     })
@@ -70,15 +70,15 @@ function build_base_url() {
 async function run() {
     const username = core.getInput("trac-username");
     const password = core.getInput("trac-password");
-    core.setSecret(username);
-    core.setSecret(password);
-    if (username == null && password == null) {
+    if ((username == null || username === '') && (password == null || password === '')) {
         core.setFailed("Username and password are not provided");
         return 1;
     }
+    core.setSecret(username);
+    core.setSecret(password);
     const josmTracEndpoint = "https://josm.openstreetmap.de/login/rpc";
     const server = new rpc(josmTracEndpoint, username, password);
-    const page_name = "SandBox";
+    const page_name = "PluginsSource";
     let promise = server.json_request({
         "params": [page_name],
         "method": "wiki.getPage",

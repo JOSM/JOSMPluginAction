@@ -33,6 +33,16 @@ on:
         default: ''
         description: "The base name of the jar file, if not the repository name. Only useful in conjunction with `update-pluginssource`."
         required: false
+      trac-username:
+        type: string
+        default: ''
+        description: The username to update Trac PluginsSource with
+        required: false
+      trac-password:
+        type: string
+        default: ''
+        description: The password to update Trac PluginsSource with
+        required: false
 
 env:
   # ANT_HOME is also our ant version
@@ -136,6 +146,6 @@ jobs:
       uses: JOSM/JOSMPluginAction/.github/actions/update_pluginssource@v1
       if: ${{ inputs.update-pluginssource }}
       with:
-        trac-username: ${{ secrets.TRAC_USERNAME }}
-        trac-password: ${{ secrets.TRAC_PASSWORD }}
+        trac-username: ${{ inputs.trac-username }}
+        trac-password: ${{ inputs.trac-password }}
         plugin-jar-name: ${{ inputs.plugin-jar-name }}
