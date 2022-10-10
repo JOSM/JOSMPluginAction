@@ -84,8 +84,18 @@ runs:
         josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
         josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
 
+  - name: Check if ivy.xml exists
+    id: ivy-file-check
+    run: |
+      if [ -f "josm/plugins/${{ github.event.repository.name }}/ivy.xml" ]; then
+        echo "::set-output name=ivy-xml::true"
+      else
+        echo "::set-output name=ivy-xml::false"
+      fi
+    shell: bash
+
   - name: Get ivy dependencies
-    if: hashFiles("josm/plugins/${{ github.event.repository.name }}/ivy.xml") !=
+    if: steps.ivy-file-check.outputs.ivy-xml == 'true'
     run: |
       cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
       ant fetch_dependencies
