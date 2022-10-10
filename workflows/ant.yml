@@ -70,6 +70,7 @@ jobs:
         java-version: ${{ inputs.java-version }}
         josm-revision: ${{ needs.josm-build.outputs.josm-revision }}
         josm-test-revision: ${{ needs.josm-build.outputs.josm-test-revision }}
+        plugin-jar-name: ${{ inputs.plugin-jar-name }}
 
     - name: Build with Ant
       run: |
