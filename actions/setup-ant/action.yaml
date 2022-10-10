@@ -4,9 +4,11 @@ inputs:
   ant-version:
     type: string
     default: 1.10.12
+    description: The version of ant to download and install
 outputs:
   ant-home:
     value: ${{ steps.set-ant-home.outputs.ant-home }}
+    description: The location of the ant install
 
 runs:
   using: "composite"

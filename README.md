@@ -7,7 +7,7 @@ This action / reusable workflow does the following:
    release, steps 1-3 are run and must pass)
 
 ## Usage
-Note that currently only `JOSM/JOSMPluginAction/.github/workflows/ant.yml` should
+Note that currently only `JOSM/JOSMPluginAction/workflows/ant.yml` should
 be used externally.
 
 If you use the cron schedule, use
@@ -42,7 +42,7 @@ on:
 
 jobs:
   call-workflow:
-    uses: JOSM/JOSMPluginAction/.github/workflows/ant.yml@v1
+    uses: JOSM/JOSMPluginAction/workflows/ant.yml@v1
 ```
 
 ## Inputs (all optional)

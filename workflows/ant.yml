@@ -53,7 +53,7 @@ jobs:
       josm-test-revision: ${{ steps.josm-build.outputs.josm-test-revision }}
     steps:
     - id: josm-build
-      uses: JOSM/JOSMPluginAction/.github/actions/josm_build@v1
+      uses: JOSM/JOSMPluginAction/actions/josm_build@v1
       with:
         java-distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
@@ -63,8 +63,8 @@ jobs:
     runs-on: ${{ inputs.operating-system }}
     needs: josm-build
     steps:
-    - uses: JOSM/JOSMPluginAction/.github/actions/setup-ant@v1
-    - uses: JOSM/JOSMPluginAction/.github/actions/plugin_clone@v1
+    - uses: JOSM/JOSMPluginAction/actions/setup-ant@v1
+    - uses: JOSM/JOSMPluginAction/actions/plugin_clone@v1
       with:
         java-distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
@@ -85,8 +85,8 @@ jobs:
     runs-on: ${{ inputs.operating-system }}
     needs: [josm-build, plugin-build]
     steps:
-    - uses: JOSM/JOSMPluginAction/.github/actions/setup-ant@v1
-    - uses: JOSM/JOSMPluginAction/.github/actions/plugin_clone@v1
+    - uses: JOSM/JOSMPluginAction/actions/setup-ant@v1
+    - uses: JOSM/JOSMPluginAction/actions/plugin_clone@v1
       with:
         java-distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
@@ -140,7 +140,7 @@ jobs:
           josm/dist/${{ github.event.repository.name }}-sources.jar
 
     - name: Update PluginsSource (actually, updating SandBox until we know that there are no problems)
-      uses: JOSM/JOSMPluginAction/.github/actions/update_pluginssource@v1
+      uses: JOSM/JOSMPluginAction/actions/update_pluginssource@v1
       if: ${{ inputs.update-pluginssource }}
       with:
         trac-username: ${{ secrets.trac-username }}

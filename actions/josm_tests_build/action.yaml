@@ -72,7 +72,7 @@ runs:
         josm/core/tools/
       key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
 
-  - uses: JOSM/JOSMPluginAction/.github/actions/setup-ant@v1
+  - uses: JOSM/JOSMPluginAction/actions/setup-ant@v1
 
   - name: build JOSM tests
     if: steps.cache-josm-tests.outputs.cache-hit != 'true'
