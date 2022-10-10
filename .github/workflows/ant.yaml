@@ -1,0 +1,56 @@
+name: Java CI (deprecated -- use JOSMPluginAction/workflows/ant.yaml instead)
+
+on:
+  workflow_call:
+    inputs:
+      josm-revision:
+        type: string
+        default: ''
+        description: The JOSM revision to use. May be empty (''), 'latest', 'tested', or 'rNUMBER' ('r10000')
+        required: false
+      operating-system:
+        type: string
+        default: ubuntu-latest
+        description: The operating system to run on
+        required: false
+      java-version:
+        type: number
+        default: 8
+        description: The java version to build against
+        required: false
+      java-distribution:
+        type: string
+        default: temurin
+        description: The java distribution to build against
+        required: false
+      update-pluginssource:
+        type: boolean
+        default: false
+        required: false
+        description: Update the PluginsSource wiki page with a new URL.
+      plugin-jar-name:
+        type: string
+        default: ''
+        description: "The base name of the jar file, if not the repository name. Only useful in conjunction with `update-pluginssource`."
+        required: false
+    secrets:
+      trac-username:
+        description: The username to update Trac PluginsSource with
+        required: false
+      trac-password:
+        description: The password to update Trac PluginsSource with
+        required: false
+
+jobs:
+  call-workflow:
+    uses: JOSM/JOSMPluginAction/workflows/ant.yml@v1
+    with:
+      josm-revision: ${{ inputs.josm-revision }}
+      operating-system: ${{ inputs.operating-system }}
+      java-version: ${{ inputs.java-version }}
+      java-distribution: ${{ inputs.java-distribution }}
+      update-pluginssource: ${{ inputs.pluginssource }}
+      plugin-jar-name: ${{ inputs.plugin-jar-name }}
+    secrets:
+      trac-username: ${{ secrets.trac-username }}
+      trac-password: ${{ secrets.trac-password }}
