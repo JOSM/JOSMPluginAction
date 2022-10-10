@@ -105,7 +105,7 @@ jobs:
 
     - name: Upload Ant reports
       if: ${{ always() }}
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: Ant reports for JOSM plugin ${{ github.event.repository.name }}
         path: |
