@@ -94,6 +94,14 @@ runs:
       fi
     shell: bash
 
+  - name: Cache plugin dependencies
+    id: cache-plugin-dependencies
+    if: steps.ivy-file-check.outputs.ivy-xml == 'true'
+    uses: actions/cache@v3.0.0
+    with:
+      key: ${{ runner.os }}-ivy-plugin-${{ hashFiles('**/ivy.xml') }}
+      path: ~/.ivy2/cache/
+
   - name: Get ivy dependencies
     if: steps.ivy-file-check.outputs.ivy-xml == 'true'
     run: |

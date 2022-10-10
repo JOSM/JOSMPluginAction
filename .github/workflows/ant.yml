@@ -94,6 +94,24 @@ jobs:
         josm-revision: ${{ needs.josm-build.outputs.josm-revision }}
         josm-test-revision: ${{ needs.josm-build.outputs.josm-test-revision }}
 
+    - name: Check if ivy.xml exists
+      id: ivy-file-check
+      run: |
+        if [ -f "josm/plugins/${{ github.event.repository.name }}/ivy.xml" ]; then
+          echo "::set-output name=ivy-xml::true"
+        else
+          echo "::set-output name=ivy-xml::false"
+        fi
+      shell: bash
+
+    - name: Cache plugin test dependencies
+      id: cache-plugin-test-dependencies
+      if: steps.ivy-file-check.outputs.ivy-xml == 'true'
+      uses: actions/cache@v3.0.0
+      with:
+        key: ${{ runner.os }}-ivy-plugin-test-${{ hashFiles('**/ivy.xml') }}
+        path: ~/.ivy2/cache/
+
     - name: Test with Ant
       id: ant-test
       run: |
