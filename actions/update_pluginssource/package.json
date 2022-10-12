@@ -2,9 +2,11 @@
   "name": "update_pluginssource",
   "version": "1.0.0",
   "description": "Update the JOSM PluginsSource page for new releases",
-  "main": "action.js",
+  "main": "src/action.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "prepare": "ncc build src/action.js --license licenses.txt",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "all": "npm run prepare"
   },
   "keywords": [],
   "author": "Taylor Smock",
@@ -13,5 +15,8 @@
     "@actions/core": "^1.10.0",
     "@actions/github": "^5.1.1",
     "@actions/http-client": "^2.0.1"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.34.0"
   }
 }
