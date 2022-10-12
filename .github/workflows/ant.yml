@@ -33,6 +33,9 @@ on:
         default: ''
         description: "The base name of the jar file, if not the repository name. Only useful in conjunction with `update-pluginssource`."
         required: false
+      ant-version:
+        type: string
+        default: 'apache-ant-1.10.12'
     secrets:
       trac-username:
         description: The username to update Trac PluginsSource with
@@ -40,10 +43,6 @@ on:
       trac-password:
         description: The password to update Trac PluginsSource with
         required: false
-
-env:
-  # ANT_HOME is also our ant version
-  ANT_HOME: 'apache-ant-1.10.12'
 
 jobs:
   josm-build:
@@ -66,6 +65,8 @@ jobs:
     needs: josm-build
     steps:
     - uses: JOSM/JOSMPluginAction/actions/setup-ant@v1
+      with:
+        ant-version: ${{ inputs.ant-version }}
     - uses: JOSM/JOSMPluginAction/actions/plugin_clone@v1
       with:
         java-distribution: ${{ inputs.java-distribution }}
@@ -82,6 +83,7 @@ jobs:
         else
           version="$GITHUB_REF_NAME-$GITHUB_SHA"
         fi
+
         ant -noinput -buildfile build.xml -Dplugin.version=$version
 
   plugin-test:
@@ -89,6 +91,8 @@ jobs:
     needs: [josm-build, plugin-build]
     steps:
     - uses: JOSM/JOSMPluginAction/actions/setup-ant@v1
+      with:
+        ant-version: ${{ inputs.ant-version }}
     - uses: JOSM/JOSMPluginAction/actions/plugin_clone@v1
       with:
         java-distribution: ${{ inputs.java-distribution }}
@@ -120,8 +124,10 @@ jobs:
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
         if [ -d "test" ]; then TEST_REPORT_PATH="test/report"; elif [ -d "src/test" ]; then TEST_REPORT_PATH="src/test/report"; else exit -1; fi
         echo "TEST_REPORT_PATH=${TEST_REPORT_PATH}" >> $GITHUB_ENV
+        
+        ant -diagnostics
 
-        "$GITHUB_WORKSPACE/${{ env.ANT_HOME }}"/bin/ant -noinput -buildfile build.xml -Dplugin.version=$version -Dtest.headless=true test
+        ant -noinput -buildfile build.xml -Dplugin.version=$version -Dtest.headless=true test
 
     - name: Upload Ant reports
       if: ${{ always() }}
