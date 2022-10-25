@@ -116,7 +116,9 @@ jobs:
       uses: actions/cache@v3.0.0
       with:
         key: ${{ runner.os }}-ivy-plugin-test-${{ hashFiles('**/ivy.xml') }}
-        path: ~/.ivy2/cache/
+        path: |
+          ~/.ivy2/cache/
+          ~/.ant/cache
 
     - name: Test with Ant
       id: ant-test

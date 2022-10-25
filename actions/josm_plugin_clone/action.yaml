@@ -1,0 +1,9 @@
+name: "JOSM plugin directory setup"
+description: "Set up JOSM directories needed for `build-common.xml`, often used by plugins"
+outputs:
+  plugin-dir:
+    description: The plugin directory (clone into this directory)
+
+runs:
+  using: "node16"
+  main: "dist/index.js"

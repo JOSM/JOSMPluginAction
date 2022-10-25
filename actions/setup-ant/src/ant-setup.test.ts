@@ -7,31 +7,36 @@ import {
   beforeEach,
   afterEach,
 } from "@jest/globals";
-import { downloadTool } from "./ant-setup";
-import * as path from "path";
-import * as io from "@actions/io";
+import { downloadAntTool } from "./ant-setup";
+import { join } from "path";
+import { mkdirP, rmRF } from "@actions/io";
 
 describe("test downloadTool", () => {
-  const tempDir = path.join(__dirname, "runner");
-  process.env["RUNNER_TEMP"] = path.join(tempDir, "temp");
-  process.env["RUNNER_TOOL_CACHE"] = path.join(tempDir, "cache");
+  const tempDir = join(__dirname, "runner");
+  process.env.RUNNER_TEMP = join(tempDir, "temp");
+  process.env.RUNNER_TOOL_CACHE = join(tempDir, "cache");
   const coreAddPath = jest.spyOn(core, "addPath");
 
   beforeEach(async () => {
-    await io.mkdirP(tempDir);
-    await io.mkdirP(process.env["RUNNER_TEMP"]);
-    await io.mkdirP(process.env["RUNNER_TOOL_CACHE"]);
+    await mkdirP(tempDir);
+    if (process.env.RUNNER_TEMP != null) {
+      await mkdirP(process.env.RUNNER_TEMP);
+    }
+    if (process.env.RUNNER_TOOL_CACHE != null) {
+      await mkdirP(process.env.RUNNER_TOOL_CACHE);
+    }
   });
 
   afterEach(async () => {
-    await io.rmRF(tempDir);
+    await rmRF(tempDir);
   });
 
   test("1.10.12", async () => {
-    await downloadTool("1.10.12");
+    await downloadAntTool("1.10.12");
     expect(coreAddPath).toBeCalledTimes(1);
     expect(coreAddPath).toBeCalledWith(
-      path.join(tempDir, "cache", "apache-ant", "1.10.12", process.arch, "bin")
+      join(tempDir, "cache", "apache-ant", "1.10.12", process.arch, "bin")
     );
+    await rmRF("1.10.12");
   }, 15_000);
 });

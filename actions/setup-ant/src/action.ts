@@ -1,12 +1,12 @@
-import * as core from "@actions/core";
-import { downloadTool } from "./ant-setup";
+import { getInput, error } from "@actions/core";
+import { downloadAntTool } from "./ant-setup";
 
-async function run() {
-  let version = core.getInput("ant-version");
+async function run(): Promise<string> {
+  let version = getInput("ant-version");
   if (version == null || version.trim() === "") {
     version = "1.10.12";
   }
-  return await downloadTool(version);
+  return await downloadAntTool(version);
 }
 
-run().catch((err) => core.error(err));
+run().catch((err) => error(err));

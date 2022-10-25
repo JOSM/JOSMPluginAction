@@ -1,11 +1,11 @@
 import { getJosmRevision } from "./josm-revision";
-import * as core from "@actions/core";
-import * as cache from "@actions/cache";
-import * as glob from "@actions/glob";
-import * as exec from "@actions/exec";
+import { group, info, getInput, setOutput, setFailed } from "@actions/core";
+import { saveCache, restoreCache } from "@actions/cache";
+import { hashFiles } from "@actions/glob";
+import { getExecOutput, exec } from "@actions/exec";
 
 async function cloneJosm(josmRevision: number): Promise<string> {
-  await exec.exec("svn", [
+  await exec("svn", [
     "checkout",
     "--depth=immediates",
     "https://josm.openstreetmap.de/osmsvn/applications/editors/josm",
@@ -13,123 +13,128 @@ async function cloneJosm(josmRevision: number): Promise<string> {
   ]);
   await updateJosm("josm/core", josmRevision);
   const options = { cwd: "josm" };
-  await exec
-    .getExecOutput("svn", ["propget", "svn:externals"], options)
+  await getExecOutput("svn", ["propget", "svn:externals"], options)
     .then((output) => output.stdout)
-    .then((output) =>
-      Promise.all(
-        output
-          .split("\n")
-          .filter((str) => str.includes("core"))
-          .map((repo) =>
-            exec.exec("svn", ["checkout"].concat(repo.split(" ")), options)
-          )
-          .values()
-      )
+    .then(
+      async (output) =>
+        await Promise.all(
+          output
+            .split("\n")
+            .filter((str) => str.includes("core"))
+            .map(
+              async (repo) =>
+                await exec("svn", ["checkout"].concat(repo.split(" ")), options)
+            )
+            .values()
+        )
     );
   return "josm/core";
 }
 
-async function updateJosm(josmSource: string, josmRevision: number) {
-  await exec.exec("svn", [
+async function updateJosm(
+  josmSource: string,
+  josmRevision: number
+): Promise<number> {
+  return await exec("svn", [
     "update",
-    "--revision=" + josmRevision,
+    `--revision=${josmRevision}`,
     "--set-depth=infinity",
     "--accept=theirs-full",
     josmSource,
   ]);
 }
 
-async function buildJosm(josmSource: string, josmRevision: number) {
-  const buildHit = await cache.restoreCache(
+async function buildJosm(
+  josmSource: string,
+  josmRevision: number
+): Promise<void> {
+  const buildHit = await restoreCache(
     [josmSource + "/dist/josm-custom.jar"],
-    "josm-r" + josmRevision
+    `josm-r${josmRevision}`
   );
   // Short-circuit
-  if (buildHit != null && buildHit != "") {
-    core.info("Cache hit for " + buildHit);
+  if (buildHit != null && buildHit !== "") {
+    info("Cache hit for " + buildHit);
     return;
   }
-  const ivyFiles = await glob.hashFiles("**/ivy.xml");
-  const ivyHit = await cache.restoreCache(
-    ["~/.ivy2/cache/", josmSource + "/tools"],
+  const ivyFiles = await hashFiles("**/ivy.xml");
+  const ivyHit = await restoreCache(
+    ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
     "ivy-" + ivyFiles
   );
-  if (ivyHit == null || ivyHit == "") {
-    await exec.exec("ant", [
-      "-buildfile",
-      josmSource + "/build.xml",
-      "resolve",
-    ]);
-    await cache.saveCache(
-      ["~/.ivy2/cache/", josmSource + "/tools"],
+  if (ivyHit == null || ivyHit === "") {
+    await exec("ant", ["-buildfile", josmSource + "/build.xml", "resolve"]);
+    await saveCache(
+      ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
       "ivy-" + ivyFiles
     );
   }
-  await exec.exec("ant", ["-buildfile", josmSource + "/build.xml", "dist"]);
-  await cache.saveCache(
+  await exec("ant", ["-buildfile", josmSource + "/build.xml", "dist"]);
+  await saveCache(
     [josmSource + "/dist/josm-custom.jar"],
-    "josm-r" + josmRevision
+    `josm-r${josmRevision}`
   );
 }
 
-async function buildJosmTests(josmSource: string, josmRevision: number) {
-  const buildHit = await cache.restoreCache(
+async function buildJosmTests(
+  josmSource: string,
+  josmRevision: number
+): Promise<void> {
+  const buildHit = await restoreCache(
     [josmSource + "/test/build"],
-    "josm-tests-r" + josmRevision
+    `josm-tests-r${josmRevision}`
   );
   // Short-circuit
-  if (buildHit != null && buildHit != "") {
-    core.info("Cache hit for " + buildHit);
+  if (buildHit != null && buildHit !== "") {
+    info("Cache hit for " + buildHit);
     return;
   }
   await buildJosm(josmSource, josmRevision);
-  const ivyFiles = await glob.hashFiles("**/ivy.xml");
-  const ivyHit = await cache.restoreCache(
-    ["~/.ivy2/cache/", josmSource + "/tools"],
+  const ivyFiles = await hashFiles(josmSource + "/**/ivy.xml");
+  const ivyHit = await restoreCache(
+    ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
     "test-ivy-" + ivyFiles
   );
-  if (ivyHit == null || ivyHit == "") {
-    await exec.exec("ant", [
-      "-buildfile",
-      josmSource + "/build.xml",
-      "test-init",
-    ]);
-    await cache.saveCache(
-      ["~/.ivy2/cache/", josmSource + "/tools"],
+  if (ivyHit == null || ivyHit === "") {
+    await exec("ant", ["-buildfile", josmSource + "/build.xml", "test-init"]);
+    await saveCache(
+      ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
       "test-ivy-" + ivyFiles
     );
   }
-  await exec.exec("ant", [
-    "-buildfile",
-    josmSource + "/build.xml",
-    "test-compile",
-  ]);
-  await cache.saveCache(
-    [josmSource + "/test/build"],
-    "josm-tests-r" + josmRevision
-  );
+  await exec("ant", ["-buildfile", josmSource + "/build.xml", "test-compile"]);
+  await saveCache([josmSource + "/test/build"], `josm-tests-r${josmRevision}`);
 }
 
-async function run() {
-  const josmRevision = await getJosmRevision(core.getInput("josm-revision"));
-  core.setOutput("josm-revision", josmRevision);
-  const josmSource = await core.group("JOSM clone r" + josmRevision, () =>
-    cloneJosm(josmRevision)
+async function run(): Promise<void> {
+  const josmRevision = await getJosmRevision(getInput("josm-revision"));
+  setOutput("josm-revision", josmRevision);
+  const josmSource = await group(
+    `JOSM clone r${josmRevision}`,
+    async () => await cloneJosm(josmRevision)
   );
-  await core.group("JOSM build r" + josmRevision, () =>
-    buildJosm(josmSource, josmRevision)
+  await group(
+    `JOSM build r${josmRevision}`,
+    async () => await buildJosm(josmSource, josmRevision)
   );
   const josmTestRevision = await getJosmRevision(
-    core.getInput("josm-test-revision")
+    getInput("josm-test-revision")
   );
-  core.setOutput("josm-test-revision", josmTestRevision);
-  await core.group("JOSM update r" + josmTestRevision, () =>
-    updateJosm(josmSource, josmTestRevision)
+  setOutput("josm-test-revision", josmTestRevision);
+  const testBuildHit = await restoreCache(
+    [josmSource + "/test/build"],
+    `josm-tests-r${josmTestRevision}`
   );
-  await core.group("JOSM build tests r" + josmTestRevision, () =>
-    buildJosmTests(josmSource, josmRevision)
-  );
+  if (testBuildHit == null) {
+    await group(
+      `JOSM update r${josmTestRevision}`,
+      async () => await updateJosm(josmSource, josmTestRevision)
+    );
+    await group(
+      `JOSM build tests r${josmTestRevision}`,
+      async () => await buildJosmTests(josmSource, josmTestRevision)
+    );
+  }
 }
 
-run().catch((err) => core.setFailed(err));
+run().catch((err) => setFailed(err));

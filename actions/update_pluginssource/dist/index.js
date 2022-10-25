@@ -9676,134 +9676,167 @@ module.exports = JSON.parse('[[[0,44],"disallowed_STD3_valid"],[[45,46],"valid"]
 /******/ 	}
 /******/ 	
 /************************************************************************/
+/******/ 	/* webpack/runtime/compat get default export */
+/******/ 	(() => {
+/******/ 		// getDefaultExport function for compatibility with non-harmony modules
+/******/ 		__nccwpck_require__.n = (module) => {
+/******/ 			var getter = module && module.__esModule ?
+/******/ 				() => (module['default']) :
+/******/ 				() => (module);
+/******/ 			__nccwpck_require__.d(getter, { a: getter });
+/******/ 			return getter;
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__nccwpck_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__nccwpck_require__.o(definition, key) && !__nccwpck_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__nccwpck_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__nccwpck_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
+/******/ 	
 /******/ 	/* webpack/runtime/compat */
 /******/ 	
 /******/ 	if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = __dirname + "/";
 /******/ 	
 /************************************************************************/
 var __webpack_exports__ = {};
-// This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
+// This entry need to be wrapped in an IIFE because it need to be in strict mode.
 (() => {
-const core = __nccwpck_require__(2186);
-const github = __nccwpck_require__(5438);
-const httpm = __nccwpck_require__(6255);
-const httpmauth = __nccwpck_require__(5526);
+"use strict";
+__nccwpck_require__.r(__webpack_exports__);
+/* harmony import */ var _actions_core__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(2186);
+/* harmony import */ var _actions_core__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__nccwpck_require__.n(_actions_core__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _actions_http_client__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(6255);
+/* harmony import */ var _actions_http_client__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__nccwpck_require__.n(_actions_http_client__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _actions_http_client_lib_auth__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(5526);
+/* harmony import */ var _actions_http_client_lib_auth__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__nccwpck_require__.n(_actions_http_client_lib_auth__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var _actions_github__WEBPACK_IMPORTED_MODULE_3__ = __nccwpck_require__(5438);
+/* harmony import */ var _actions_github__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__nccwpck_require__.n(_actions_github__WEBPACK_IMPORTED_MODULE_3__);
 
-class rpc {
-  constructor(endpoint, username, password) {
-    this.endpoint = endpoint;
-    this.http = new httpm.HttpClient("JOSMPluginAction/update_pluginssource", [
-      new httpmauth.BasicCredentialHandler(username, password),
-    ]);
-  }
 
-  json_request(requestBody) {
-    let realBody;
-    if (requestBody instanceof String) {
-      realBody = requestBody;
-    } else if (requestBody instanceof Object || requestBody instanceof Array) {
-      realBody = JSON.stringify(requestBody);
-    } else {
-      throw "Unknown type: " + typeof requestBody;
+
+
+class RPC {
+    endpoint;
+    http;
+    constructor(endpoint, username, password) {
+        this.endpoint = endpoint;
+        this.http = new _actions_http_client__WEBPACK_IMPORTED_MODULE_1__.HttpClient("JOSMPluginAction/update_pluginssource", [
+            new _actions_http_client_lib_auth__WEBPACK_IMPORTED_MODULE_2__.BasicCredentialHandler(username, password),
+        ]);
     }
-    return this.http.post(this.endpoint, realBody, {
-      "Content-Type": "application/json",
+    async json_request(requestBody) {
+        let realBody;
+        if (requestBody instanceof String) {
+            realBody = requestBody;
+        }
+        else if (requestBody instanceof Object || requestBody instanceof Array) {
+            realBody = JSON.stringify(requestBody);
+        }
+        else {
+            throw Error("Unknown type: " + typeof requestBody);
+        }
+        return await this.http.post(this.endpoint, realBody, {
+            "Content-Type": "application/json",
+        });
+    }
+}
+function replacePageText(pageText) {
+    const baseUrl = buildBaseUrl();
+    if (!pageText.includes(baseUrl)) {
+        throw Error("You need to do a manual release at least once, expected base url " +
+            baseUrl);
+    }
+    let newUrl;
+    const inputJarName = (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)("plugin-jar-name");
+    let jarName = inputJarName != null && inputJarName.length > 0
+        ? (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)("plugin-jar-name")
+        : _actions_github__WEBPACK_IMPORTED_MODULE_3__.context.repo.repo;
+    // This should probably be replaced with context.refType/context.refProtected at some point when it is implemented
+    if (process.env.GITHUB_REF_TYPE === "tag" &&
+        process.env.GITHUB_REF_PROTECTED === "true") {
+        // Release build
+        jarName += ".jar";
+        newUrl =
+            baseUrl + "/releases/download/" + _actions_github__WEBPACK_IMPORTED_MODULE_3__.context.ref + "/" + jarName + ".jar";
+    }
+    else {
+        // dev build. We don't have a place to store the dev builds, so throw an exception for now.
+        // jar_name += "-dev.jar";
+        throw Error("We don't currently support dev builds");
+    }
+    const re = new RegExp(baseUrl + "/releases/download/" + ".*" + jarName);
+    const newText = pageText.replace(re, newUrl);
+    if (newText === pageText) {
+        throw Error("No update is necessary for PluginsSource");
+    }
+    return newText;
+}
+async function updatePageText(server, pageName, pageText) {
+    const repo = _actions_github__WEBPACK_IMPORTED_MODULE_3__.context.repo;
+    return server.json_request({
+        params: [
+            "SandBox" /* TODO Replace with page_name */,
+            pageText,
+            { comment: repo.owner + "/" + repo.repo + ": Update plugin link" },
+        ],
+        method: "wiki.putPage",
+        id: 1,
     });
-  }
 }
-
-function replace_page_text(page_text) {
-  const base_url = build_base_url();
-  if (!page_text.includes(base_url)) {
-    throw (
-      "You need to do a manual release at least once, expected base url " +
-      base_url
-    );
-  }
-  let new_url;
-  let input_jar_name = core.getInput("plugin-jar-name");
-  let jar_name =
-    input_jar_name != null && input_jar_name.length > 0
-      ? core.getInput("plugin-jar-name")
-      : github.context.repo.repo;
-  // This should probably be replaced with github.context.refType/github.context.refProtected at some point when it is implemented
-  if (
-    process.env.GITHUB_REF_TYPE === "tag" &&
-    process.env.GITHUB_REF_PROTECTED === "true"
-  ) {
-    // Release build
-    jar_name += ".jar";
-    new_url =
-      base_url +
-      "/releases/download/" +
-      github.context.ref +
-      "/" +
-      jar_name +
-      ".jar";
-  } else {
-    // dev build. We don't have a place to store the dev builds, so throw an exception for now.
-    // jar_name += "-dev.jar";
-    throw "We don't currently support dev builds";
-  }
-  let re = new RegExp(base_url + "/releases/download/" + ".*" + jar_name);
-  let new_text = page_text.replace(re, new_url);
-  if (new_text === page_text) {
-    throw "No update is necessary for PluginsSource";
-  }
-  return new_text;
+function buildBaseUrl() {
+    const owner = _actions_github__WEBPACK_IMPORTED_MODULE_3__.context.repo.owner;
+    const repo = _actions_github__WEBPACK_IMPORTED_MODULE_3__.context.repo.repo;
+    const baseUrl = _actions_github__WEBPACK_IMPORTED_MODULE_3__.context.serverUrl;
+    return baseUrl + "/" + owner + "/" + repo;
 }
-
-function update_page_text(server, page_name, page_text) {
-  let repo = github.context.repo;
-  return server.json_request({
-    params: [
-      "SandBox" /*TODO Replace with page_name*/,
-      page_text,
-      { comment: repo.owner + "/" + repo.repo + ": Update plugin link" },
-    ],
-    method: "wiki.putPage",
-    id: 1,
-  });
-}
-
-function build_base_url() {
-  const owner = github.context.repo.owner;
-  const repo = github.context.repo.repo;
-  const base_url = github.context.serverUrl;
-  return base_url + "/" + owner + "/" + repo;
-}
-
 async function run() {
-  const username = core.getInput("trac-username");
-  const password = core.getInput("trac-password");
-  if (
-    (username == null || username === "") &&
-    (password == null || password === "")
-  ) {
-    core.setFailed("Username and password are not provided");
-    return 1;
-  }
-  core.setSecret(username);
-  core.setSecret(password);
-  const josmTracEndpoint = "https://josm.openstreetmap.de/login/rpc";
-  const server = new rpc(josmTracEndpoint, username, password);
-  const page_name = "PluginsSource";
-  let promise = server
-    .json_request({
-      params: [page_name],
-      method: "wiki.getPage",
-      id: 1,
+    const username = (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)("trac-username");
+    const password = (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput)("trac-password");
+    if ((username == null || username === "") &&
+        (password == null || password === "")) {
+        throw Error("Username and password are not provided");
+    }
+    (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.setSecret)(username);
+    (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.setSecret)(password);
+    const josmTracEndpoint = "https://josm.openstreetmap.de/login/rpc";
+    const server = new RPC(josmTracEndpoint, username, password);
+    const pageName = "PluginsSource";
+    return await server
+        .json_request({
+        params: [pageName],
+        method: "wiki.getPage",
+        id: 1,
     })
-    .then((response) => response.readBody())
-    .then((text) => JSON.parse(text))
-    .then((json) => json["result"])
-    .then((pageText) => replace_page_text(pageText))
-    .then((pageText) => update_page_text(server, page_name, pageText))
-    .catch((err) => core.setFailed(err));
-  await promise;
+        .then(async (response) => await response.readBody())
+        .then((text) => JSON.parse(text))
+        .then((json) => json.result)
+        .then((pageText) => replacePageText(pageText))
+        .then(async (pageText) => await updatePageText(server, pageName, pageText));
 }
-
-run().catch((err) => core.setFailed(err));
+run().catch((err) => (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.setFailed)(err));
 
 })();
 

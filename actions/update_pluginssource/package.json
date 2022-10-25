@@ -4,9 +4,10 @@
   "description": "Update the JOSM PluginsSource page for new releases",
   "main": "src/action.js",
   "scripts": {
-    "prepare": "ncc build src/action.js --license licenses.txt",
+    "lint": "eslint src",
+    "prepare": "ncc build src/action.ts --license licenses.txt",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "all": "npm run prepare"
+    "all": "npm run lint && npm run prepare"
   },
   "keywords": [],
   "author": "Taylor Smock",
@@ -17,6 +18,12 @@
     "@actions/http-client": "^2.0.1"
   },
   "devDependencies": {
+    "eslint": "^8.26.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-config-standard-with-typescript": "^23.0.0",
+    "@types/node": "^18.11.5",
+    "@typescript-eslint/parser": "^5.41.0",
+    "@typescript-eslint/eslint-plugin": "^5.41.0",
     "@vercel/ncc": "^0.34.0"
   }
 }

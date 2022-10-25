@@ -36,92 +36,17 @@ runs:
       java-version: ${{ inputs.java-version }}
       distribution: ${{ inputs.java-distribution }}
 
-  - name: Clone JOSM
-    run: |
-      svn co --depth=immediates https://josm.openstreetmap.de/osmsvn/applications/editors/josm $GITHUB_WORKSPACE/josm
-      cd $GITHUB_WORKSPACE/josm
-      svn up --set-depth=immediates core
-      svn up --set-depth=immediates plugins
-      svn up --set-depth=infinity --accept=theirs-full i18n plugins/{00_core_test_config,00_core_test_lib,00_core_tools,00_tools}
-      svn propget svn:externals | grep core | xargs -L1 svn co --depth=empty
-      cd core
-      svn up ivy.xml ivysettings.xml
-      cd ../plugins
-      svn propget svn:externals | grep 00_core | xargs -L1 svn co
-    shell: bash
+  - name: Clone JOSM plugin directories
+    id: josm-plugin-clone
+    uses: JOSM/JOSMPluginAction/actions/josm_plugin_clone@v1
+
   - uses: actions/checkout@v3
     with:
-      path: josm/plugins/${{ github.event.repository.name }}
-  - name: Cache
-    uses: actions/cache@v3.0.0
-    with:
-      path: |
-        ~/.ivy2/cache/
-        josm/core/tools/
-      key: ${{ runner.os }}-ivy2-${{ hashFiles('**/ivy.xml') }}
-  - name: Restore JOSM cache
-    id: cache-josm
-    uses: actions/cache@v3.0.0
-    with:
-      path: |
-        josm/core/dist/josm-custom.jar
-      key: josm-r${{ inputs.josm-revision }}
-  - name: Restore JOSM tests cache
-    id: cache-josm-tests
-    uses: actions/cache@v3.0.0
-    with:
-      path: |
-        josm/core/test/build
-      key: josm-tests-r${{ inputs.josm-test-revision }}
-
-  - name: Cache build
-    id: cache-plugin-build
-    uses: actions/cache@v3.0.0
-    with:
-      key: ${{ runner.os }}-${{ github.sha }}
-      path: |
-        josm/dist/${{ inputs.plugin-jar-name }}.jar
-        josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
-        josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
-
-  - name: Check if ivy.xml exists
-    id: ivy-file-check
-    run: |
-      if [ -f "josm/plugins/${{ github.event.repository.name }}/ivy.xml" ]; then
-        echo "::set-output name=ivy-xml::true"
-      else
-        echo "::set-output name=ivy-xml::false"
-      fi
-    shell: bash
-
-  - name: Cache plugin dependencies
-    id: cache-plugin-dependencies
-    if: steps.ivy-file-check.outputs.ivy-xml == 'true'
-    uses: actions/cache@v3.0.0
-    with:
-      key: ${{ runner.os }}-ivy-plugin-${{ hashFiles('**/ivy.xml') }}
-      path: ~/.ivy2/cache/
-
-  - name: Get ivy dependencies
-    if: steps.ivy-file-check.outputs.ivy-xml == 'true'
-    run: |
-      cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
-      ant fetch_dependencies
-    shell: bash
-
+      path: ${{ steps.josm-plugin-clone.outputs.plugin-dir }}/${{ github.event.repository.name }}
   - name: Get plugin dependencies
-    run: |
-      cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
-      DEPENDENCIES=""
-      if [ -f "gradle.properties" ]; then
-        DEPENDENCIES="$(cat gradle.properties | grep 'plugin.requires' | awk -F'=' '{print $2}')"
-      fi
-      if [ -z "${DEPENDENCIES}" ] && [ -f "build.xml" ]; then
-        DEPENDENCIES="$(cat build.xml | grep 'plugin.requires' | awk -F'\"' '{print $4}')"
-      fi
-      DEPENDENCIES=$(echo $DEPENDENCIES | tr ";" "\n")
-      cd $GITHUB_WORKSPACE/josm/dist
-      for dependency in $DEPENDENCIES; do
-        svn up $dependency.jar
-      done
-    shell: bash
+    uses: JOSM/JOSMPluginAction/actions/josm_plugin_dependencies@v1
+    with:
+      plugin-dir: ${{ steps.josm-plugin-clone.outputs.plugin-dir }}/${{ github.event.repository.name }}
+      josm-revision: ${{ inputs.josm-revision }}
+      josm-test-revision: ${{ inputs.josm-test-revision }}
+      plugin-jar-name: ${{ inputs.plugin-jar-name }}
