@@ -75,6 +75,17 @@ jobs:
         josm-test-revision: ${{ needs.josm-build.outputs.josm-test-revision }}
         plugin-jar-name: ${{ inputs.plugin-jar-name }}
 
+
+    - name: Cache build
+      id: cache-plugin-build
+      uses: actions/cache@v3.0.0
+      with:
+        key: ${{ github.event.repository.name }}-${{ github.sha }}
+        path: |
+          josm/dist/${{ inputs.plugin-jar-name }}.jar
+          josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
+          josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
+
     - name: Build with Ant
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
@@ -154,7 +165,7 @@ jobs:
       id: cache-plugin-build
       uses: actions/cache@v3.0.0
       with:
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ github.event.repository.name }}-${{ github.sha }}
+        key: ${{ github.event.repository.name }}-${{ github.sha }}
         path: |
           josm/dist/${{ inputs.plugin-jar-name }}.jar
           josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar

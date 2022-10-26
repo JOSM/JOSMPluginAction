@@ -94,7 +94,7 @@ async function run(): Promise<void> {
       join(josmDist, pluginJarName + "-javadoc.jar"),
       join(josmDist, pluginJarName + "-sources.jar"),
     ],
-    `${process.platform}-${process.arch}-${context.repo.repo}-${context.sha}`
+    `${context.repo.repo}-${context.sha}`
   );
   if (buildHit != null) {
     info(`Plugin already built: ${buildHit}`);

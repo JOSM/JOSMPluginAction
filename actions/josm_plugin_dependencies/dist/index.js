@@ -66875,7 +66875,7 @@ async function run() {
         (0,external_path_.join)(josmDist, pluginJarName + ".jar"),
         (0,external_path_.join)(josmDist, pluginJarName + "-javadoc.jar"),
         (0,external_path_.join)(josmDist, pluginJarName + "-sources.jar"),
-    ], `${process.platform}-${process.arch}-${github.context.repo.repo}-${github.context.sha}`);
+    ], `${github.context.repo.repo}-${github.context.sha}`);
     if (buildHit != null) {
         (0,core.info)(`Plugin already built: ${buildHit}`);
         return;
