@@ -30,7 +30,7 @@ on:
         description: Update the PluginsSource wiki page with a new URL.
       plugin-jar-name:
         type: string
-        default: ''
+        default: ${{ github.event.repository.name }}
         description: "The base name of the jar file, if not the repository name. Only useful in conjunction with `update-pluginssource`."
         required: false
       ant-version:
@@ -156,17 +156,17 @@ jobs:
       with:
         key: ${{ runner.os }}-${{ runner.arch }}-${{ github.event.repository.name }}-${{ github.sha }}
         path: |
-          josm/dist/${{ github.event.repository.name }}.jar
-          josm/dist/${{ github.event.repository.name }}-javadoc.jar
-          josm/dist/${{ github.event.repository.name }}-sources.jar
+          josm/dist/${{ inputs.plugin-jar-name }}.jar
+          josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
+          josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
     - name: Release
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: |
-          josm/dist/${{ github.event.repository.name }}.jar
-          josm/dist/${{ github.event.repository.name }}-javadoc.jar
-          josm/dist/${{ github.event.repository.name }}-sources.jar
+          josm/dist/${{ inputs.plugin-jar-name }}.jar
+          josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
+          josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
 
     - name: Update PluginsSource (actually, updating SandBox until we know that there are no problems)
       uses: JOSM/JOSMPluginAction/actions/update_pluginssource@v1
