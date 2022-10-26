@@ -37,7 +37,9 @@ async function dependencies(pluginDir: string): Promise<void> {
     await downloadPluginDependencies(join("josm", "dist"), dependencies);
     await restoreCache(
       ["~/.ivy2/cache", "~/.ant/cache", "josm/core/tools"],
-      "ivy-" + (await hashFiles("josm/core/**/ivy.xml"))
+      `${process.platform}-${process.arch}-ivy-${await hashFiles(
+        "josm/core/**/ivy.xml"
+      )}`
     );
     await group("Tool dependencies", async () => {
       const coreTools = join("josm", "plugins", "00_core_tools");
@@ -55,7 +57,9 @@ async function dependencies(pluginDir: string): Promise<void> {
     if (existsSync(join(pluginDir, "ivy.xml"))) {
       const ivyPluginCache = await restoreCache(
         ["~/.ivy2/cache", "~/.ant/cache"],
-        "ivy-plugin-" + (await hashFiles("josm/plugins/**/ivy.xml"))
+        `${process.platform}-${process.arch}-ivy-plugin-${await hashFiles(
+          "josm/plugins/**/ivy.xml"
+        )}`
       );
       if (ivyPluginCache == null) {
         await exec("ant", [
@@ -65,7 +69,9 @@ async function dependencies(pluginDir: string): Promise<void> {
         ]);
         await saveCache(
           ["~/.ivy2/cache/", "~/.ant/cache"],
-          "ivy-plugin-" + (await hashFiles("josm/plugins/**/ivy.xml"))
+          `${process.platform}-${process.arch}-ivy-plugin-${await hashFiles(
+            "josm/plugins/**/ivy.xml"
+          )}`
         );
       }
     }
@@ -88,7 +94,7 @@ async function run(): Promise<void> {
       join(josmDist, pluginJarName + "-javadoc.jar"),
       join(josmDist, pluginJarName + "-sources.jar"),
     ],
-    context.repo.repo + "-" + context.sha
+    `${process.platform}-${process.arch}-${context.repo.repo}-${context.sha}`
   );
   if (buildHit != null) {
     info(`Plugin already built: ${buildHit}`);

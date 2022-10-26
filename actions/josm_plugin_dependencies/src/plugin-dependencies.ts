@@ -52,7 +52,10 @@ export async function downloadPluginDependencies(
   }
   if (
     !Number.isNaN(maxRevision) &&
-    (await restoreCache(paths, `${paths.join(";")}-${maxRevision}`)) != null
+    (await restoreCache(
+      paths,
+      `${process.platform}-${process.arch}-${paths.join(";")}-${maxRevision}`
+    )) != null
   ) {
     return;
   }
@@ -60,6 +63,9 @@ export async function downloadPluginDependencies(
     await exec("svn", ["update", path]);
   }
   if (!Number.isNaN(maxRevision)) {
-    await saveCache(paths, `${paths.join(";")}-${maxRevision}`);
+    await saveCache(
+      paths,
+      `${process.platform}-${process.arch}-${paths.join(";")}-${maxRevision}`
+    );
   }
 }

@@ -60,13 +60,13 @@ async function buildJosm(
   const ivyFiles = await hashFiles("**/ivy.xml");
   const ivyHit = await restoreCache(
     ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
-    "ivy-" + ivyFiles
+    `${process.platform}-${process.arch}-ivy-${ivyFiles}`
   );
   if (ivyHit == null || ivyHit === "") {
     await exec("ant", ["-buildfile", josmSource + "/build.xml", "resolve"]);
     await saveCache(
       ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
-      "ivy-" + ivyFiles
+      `${process.platform}-${process.arch}-ivy-${ivyFiles}`
     );
   }
   await exec("ant", ["-buildfile", josmSource + "/build.xml", "dist"]);
@@ -93,13 +93,13 @@ async function buildJosmTests(
   const ivyFiles = await hashFiles(josmSource + "/**/ivy.xml");
   const ivyHit = await restoreCache(
     ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
-    "test-ivy-" + ivyFiles
+    `${process.platform}-${process.arch}-test-ivy-${ivyFiles}`
   );
   if (ivyHit == null || ivyHit === "") {
     await exec("ant", ["-buildfile", josmSource + "/build.xml", "test-init"]);
     await saveCache(
       ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
-      "test-ivy-" + ivyFiles
+      `${process.platform}-${process.arch}-test-ivy-${ivyFiles}`
     );
   }
   await exec("ant", ["-buildfile", josmSource + "/build.xml", "test-compile"]);

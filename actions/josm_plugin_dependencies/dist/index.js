@@ -66791,14 +66791,14 @@ async function downloadPluginDependencies(svnDirectory, dependencies) {
         paths.push(path);
     }
     if (!Number.isNaN(maxRevision) &&
-        (await (0,cache.restoreCache)(paths, `${paths.join(";")}-${maxRevision}`)) != null) {
+        (await (0,cache.restoreCache)(paths, `${process.platform}-${process.arch}-${paths.join(";")}-${maxRevision}`)) != null) {
         return;
     }
     for (const path of paths) {
         await (0,exec.exec)("svn", ["update", path]);
     }
     if (!Number.isNaN(maxRevision)) {
-        await (0,cache.saveCache)(paths, `${paths.join(";")}-${maxRevision}`);
+        await (0,cache.saveCache)(paths, `${process.platform}-${process.arch}-${paths.join(";")}-${maxRevision}`);
     }
 }
 
@@ -66833,7 +66833,7 @@ async function dependencies(pluginDir) {
     const dependencies = await pluginDependencies(pluginDir);
     await (0,core.group)("Download plugin dependencies", async () => {
         await downloadPluginDependencies((0,external_path_.join)("josm", "dist"), dependencies);
-        await (0,cache.restoreCache)(["~/.ivy2/cache", "~/.ant/cache", "josm/core/tools"], "ivy-" + (await (0,glob.hashFiles)("josm/core/**/ivy.xml")));
+        await (0,cache.restoreCache)(["~/.ivy2/cache", "~/.ant/cache", "josm/core/tools"], `${process.platform}-${process.arch}-ivy-${await (0,glob.hashFiles)("josm/core/**/ivy.xml")}`);
         await (0,core.group)("Tool dependencies", async () => {
             const coreTools = (0,external_path_.join)("josm", "plugins", "00_core_tools");
             const corePaths = ["~/.ivy2/cache", "~/.ant/cache"];
@@ -66848,14 +66848,14 @@ async function dependencies(pluginDir) {
             }
         });
         if ((0,external_fs_.existsSync)((0,external_path_.join)(pluginDir, "ivy.xml"))) {
-            const ivyPluginCache = await (0,cache.restoreCache)(["~/.ivy2/cache", "~/.ant/cache"], "ivy-plugin-" + (await (0,glob.hashFiles)("josm/plugins/**/ivy.xml")));
+            const ivyPluginCache = await (0,cache.restoreCache)(["~/.ivy2/cache", "~/.ant/cache"], `${process.platform}-${process.arch}-ivy-plugin-${await (0,glob.hashFiles)("josm/plugins/**/ivy.xml")}`);
             if (ivyPluginCache == null) {
                 await (0,exec.exec)("ant", [
                     "-buildfile",
                     (0,external_path_.join)(pluginDir, "build.xml"),
                     "fetch_dependencies",
                 ]);
-                await (0,cache.saveCache)(["~/.ivy2/cache/", "~/.ant/cache"], "ivy-plugin-" + (await (0,glob.hashFiles)("josm/plugins/**/ivy.xml")));
+                await (0,cache.saveCache)(["~/.ivy2/cache/", "~/.ant/cache"], `${process.platform}-${process.arch}-ivy-plugin-${await (0,glob.hashFiles)("josm/plugins/**/ivy.xml")}`);
             }
         }
     });
@@ -66875,7 +66875,7 @@ async function run() {
         (0,external_path_.join)(josmDist, pluginJarName + ".jar"),
         (0,external_path_.join)(josmDist, pluginJarName + "-javadoc.jar"),
         (0,external_path_.join)(josmDist, pluginJarName + "-sources.jar"),
-    ], github.context.repo.repo + "-" + github.context.sha);
+    ], `${process.platform}-${process.arch}-${github.context.repo.repo}-${github.context.sha}`);
     if (buildHit != null) {
         (0,core.info)(`Plugin already built: ${buildHit}`);
         return;

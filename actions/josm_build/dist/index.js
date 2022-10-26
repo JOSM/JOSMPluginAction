@@ -63872,10 +63872,10 @@ async function buildJosm(josmSource, josmRevision) {
         return;
     }
     const ivyFiles = await (0,glob.hashFiles)("**/ivy.xml");
-    const ivyHit = await (0,cache.restoreCache)(["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"], "ivy-" + ivyFiles);
+    const ivyHit = await (0,cache.restoreCache)(["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"], `${process.platform}-${process.arch}-ivy-${ivyFiles}`);
     if (ivyHit == null || ivyHit === "") {
         await (0,exec.exec)("ant", ["-buildfile", josmSource + "/build.xml", "resolve"]);
-        await (0,cache.saveCache)(["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"], "ivy-" + ivyFiles);
+        await (0,cache.saveCache)(["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"], `${process.platform}-${process.arch}-ivy-${ivyFiles}`);
     }
     await (0,exec.exec)("ant", ["-buildfile", josmSource + "/build.xml", "dist"]);
     await (0,cache.saveCache)([josmSource + "/dist/josm-custom.jar"], `josm-r${josmRevision}`);
@@ -63889,10 +63889,10 @@ async function buildJosmTests(josmSource, josmRevision) {
     }
     await buildJosm(josmSource, josmRevision);
     const ivyFiles = await (0,glob.hashFiles)(josmSource + "/**/ivy.xml");
-    const ivyHit = await (0,cache.restoreCache)(["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"], "test-ivy-" + ivyFiles);
+    const ivyHit = await (0,cache.restoreCache)(["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"], `${process.platform}-${process.arch}-test-ivy-${ivyFiles}`);
     if (ivyHit == null || ivyHit === "") {
         await (0,exec.exec)("ant", ["-buildfile", josmSource + "/build.xml", "test-init"]);
-        await (0,cache.saveCache)(["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"], "test-ivy-" + ivyFiles);
+        await (0,cache.saveCache)(["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"], `${process.platform}-${process.arch}-test-ivy-${ivyFiles}`);
     }
     await (0,exec.exec)("ant", ["-buildfile", josmSource + "/build.xml", "test-compile"]);
     await (0,cache.saveCache)([josmSource + "/test/build"], `josm-tests-r${josmRevision}`);

@@ -115,7 +115,7 @@ jobs:
       if: steps.ivy-file-check.outputs.ivy-xml == 'true'
       uses: actions/cache@v3.0.0
       with:
-        key: ${{ runner.os }}-ivy-plugin-test-${{ hashFiles('**/ivy.xml') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-ivy-plugin-test-${{ hashFiles('**/ivy.xml') }}
         path: |
           ~/.ivy2/cache/
           ~/.ant/cache
@@ -154,7 +154,7 @@ jobs:
       id: cache-plugin-build
       uses: actions/cache@v3.0.0
       with:
-        key: ${{ runner.os }}-${{ github.sha }}
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ github.event.repository.name }}-${{ github.sha }}
         path: |
           josm/dist/${{ github.event.repository.name }}.jar
           josm/dist/${{ github.event.repository.name }}-javadoc.jar
