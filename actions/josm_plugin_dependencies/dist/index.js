@@ -66871,15 +66871,11 @@ async function run() {
         pluginJarName = pluginJarName.replace(/.jar$/, "");
     }
     await josm();
-    const buildHit = await (0,cache.restoreCache)([
+    await (0,cache.restoreCache)([
         (0,external_path_.join)(josmDist, pluginJarName + ".jar"),
         (0,external_path_.join)(josmDist, pluginJarName + "-javadoc.jar"),
         (0,external_path_.join)(josmDist, pluginJarName + "-sources.jar"),
     ], `${github.context.repo.repo}-${github.context.sha}`);
-    if (buildHit != null) {
-        (0,core.info)(`Plugin already built: ${buildHit}`);
-        return;
-    }
     await dependencies(pluginDir);
 }
 run().catch((err) => (0,core.setFailed)(err));

@@ -88,7 +88,7 @@ async function run(): Promise<void> {
     pluginJarName = pluginJarName.replace(/.jar$/, "");
   }
   await josm();
-  const buildHit = await restoreCache(
+  await restoreCache(
     [
       join(josmDist, pluginJarName + ".jar"),
       join(josmDist, pluginJarName + "-javadoc.jar"),
@@ -96,10 +96,6 @@ async function run(): Promise<void> {
     ],
     `${context.repo.repo}-${context.sha}`
   );
-  if (buildHit != null) {
-    info(`Plugin already built: ${buildHit}`);
-    return;
-  }
   await dependencies(pluginDir);
 }
 
