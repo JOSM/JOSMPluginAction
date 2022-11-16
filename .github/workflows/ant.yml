@@ -135,7 +135,8 @@ jobs:
       id: ant-test
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
-        if [ -d "test" ]; then TEST_REPORT_PATH="test/report"; elif [ -d "src/test" ]; then TEST_REPORT_PATH="src/test/report"; else exit -1; fi
+        # Not all plugins have tests.
+        if [ -d "test" ]; then TEST_REPORT_PATH="test/report"; elif [ -d "src/test" ]; then TEST_REPORT_PATH="src/test/report"; else exit 0; fi
         echo "TEST_REPORT_PATH=${TEST_REPORT_PATH}" >> $GITHUB_ENV
         
         ant -diagnostics
