@@ -38,10 +38,10 @@ on:
         default: 'apache-ant-1.10.12'
     secrets:
       trac-username:
-        description: The username to update Trac PluginsSource with
+        description: The username to update Trac PluginsSource with (deprecated)
         required: false
       trac-password:
-        description: The password to update Trac PluginsSource with
+        description: The password to update Trac PluginsSource with (deprecated)
         required: false
 
 jobs:
@@ -180,10 +180,6 @@ jobs:
           josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
           josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
 
-    - name: Update PluginsSource (actually, updating SandBox until we know that there are no problems)
-      uses: JOSM/JOSMPluginAction/actions/update_pluginssource@v1
+    - name: Notify users about GitHub release latest checkbox
       if: ${{ inputs.update-pluginssource }}
-      with:
-        trac-username: ${{ secrets.trac-username }}
-        trac-password: ${{ secrets.trac-password }}
-        plugin-jar-name: ${{ inputs.plugin-jar-name }}
+      run: echo "Use the latest toggle in the GitHub release page. URLs look like https://github.com/${{ github.repository }}/releases/latest/download/${{ inputs.plugin-jar-name }} ."
