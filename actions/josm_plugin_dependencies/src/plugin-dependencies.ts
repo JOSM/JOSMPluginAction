@@ -66,7 +66,9 @@ export async function downloadPluginDependencies(
         path.replace(svnDirectory, "").substring(1 /* for / */)
       )
         .then((blob) => Buffer.from(blob))
-        .then((blob) => writeFileSync(path, blob));
+        .then((blob) => {
+          writeFileSync(path, blob);
+        });
     }
   }
   if (!Number.isNaN(maxRevision)) {
@@ -80,8 +82,8 @@ export async function downloadPluginDependencies(
 async function downloadPluginDependencyFromManifest(
   path: string
 ): Promise<ArrayBuffer> {
-  return fetch("https://josm.openstreetmap.de/plugin")
-    .then((result) => result.text())
+  return await fetch("https://josm.openstreetmap.de/plugin")
+    .then(async (result) => await result.text())
     .then((text) =>
       text
         .split("\n")
@@ -92,6 +94,6 @@ async function downloadPluginDependencyFromManifest(
     )
     .then((lines) => lines[0])
     .then((line) => line.split(";")[1])
-    .then((url) => fetch(url))
-    .then((response) => response.arrayBuffer());
+    .then(async (url) => await fetch(url))
+    .then(async (response) => await response.arrayBuffer());
 }

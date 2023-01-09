@@ -6758,7 +6758,9 @@ async function run() {
     }
     return await downloadAntTool(version);
 }
-run().catch((err) => (0,core.error)(err));
+run().catch((err) => {
+    (0,core.error)(err);
+});
 
 })();
 

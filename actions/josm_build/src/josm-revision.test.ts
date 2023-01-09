@@ -13,9 +13,9 @@ describe("test revisions", () => {
         200,
         "<html><head><title>svn - Revision 19000: /trunk</title></head>\n<body></body></html>"
       );
-    return await getJosmRevision("").then((revision) =>
-      expect(revision).toBe(19000)
-    );
+    await getJosmRevision("").then((revision) => {
+      expect(revision).toBe(19000);
+    });
   });
   test("head (null)", async () => {
     nockJosm
@@ -24,31 +24,31 @@ describe("test revisions", () => {
         200,
         "<html><head><title>svn - Revision 19000: /trunk</title></head>\n<body></body></html>"
       );
-    return await getJosmRevision(null).then((revision) =>
-      expect(revision).toBe(19000)
-    );
+    await getJosmRevision(null).then((revision) => {
+      expect(revision).toBe(19000);
+    });
   });
   test("latest", async () => {
     nockJosm.get("/latest").reply(200, "18000");
-    return await getJosmRevision("latest").then((revision) =>
-      expect(revision).toBe(18000)
-    );
+    await getJosmRevision("latest").then((revision) => {
+      expect(revision).toBe(18000);
+    });
   });
   test("tested", async () => {
     nockJosm.get("/tested").reply(200, "17000");
-    return await getJosmRevision("tested").then((revision) =>
-      expect(revision).toBe(17000)
-    );
+    await getJosmRevision("tested").then((revision) => {
+      expect(revision).toBe(17000);
+    });
   });
   test("r16000", async () => {
-    return await getJosmRevision("r16000").then((revision) =>
-      expect(revision).toBe(16000)
-    );
+    await getJosmRevision("r16000").then((revision) => {
+      expect(revision).toBe(16000);
+    });
   });
   test("15000", async () => {
-    return await getJosmRevision("15000").then((revision) =>
-      expect(revision).toBe(15000)
-    );
+    await getJosmRevision("15000").then((revision) => {
+      expect(revision).toBe(15000);
+    });
   });
   nockJosm.done();
 });

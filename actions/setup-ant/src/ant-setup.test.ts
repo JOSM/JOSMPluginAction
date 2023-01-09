@@ -10,6 +10,7 @@ import {
 import { downloadAntTool } from "./ant-setup";
 import { join } from "path";
 import { mkdirP, rmRF } from "@actions/io";
+import { existsSync } from "fs";
 
 describe("test downloadTool", () => {
   const tempDir = join(__dirname, "runner");
@@ -28,7 +29,9 @@ describe("test downloadTool", () => {
   });
 
   afterEach(async () => {
-    await rmRF(tempDir);
+    if (existsSync(tempDir)) {
+      await rmRF(tempDir);
+    }
   });
 
   test("1.10.12", async () => {

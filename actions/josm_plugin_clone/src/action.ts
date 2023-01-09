@@ -76,8 +76,12 @@ async function cloneJosmFiles(directory: string): Promise<void> {
 }
 
 async function run(): Promise<void> {
-  await group("Clone JOSM files", async () => await cloneJosmFiles("."));
+  await group("Clone JOSM files", async () => {
+    await cloneJosmFiles(".");
+  });
   setOutput("plugin-dir", join("josm", "plugins"));
 }
 
-run().catch((err) => setFailed(err));
+run().catch((err) => {
+  setFailed(err);
+});

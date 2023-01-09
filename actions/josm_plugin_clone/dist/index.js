@@ -4228,10 +4228,14 @@ async function cloneJosmFiles(directory) {
     await cloneCoreSubRepos((0,path__WEBPACK_IMPORTED_MODULE_2__.join)(directory, "josm", "plugins"), null);
 }
 async function run() {
-    await (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.group)("Clone JOSM files", async () => await cloneJosmFiles("."));
+    await (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.group)("Clone JOSM files", async () => {
+        await cloneJosmFiles(".");
+    });
     (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.setOutput)("plugin-dir", (0,path__WEBPACK_IMPORTED_MODULE_2__.join)("josm", "plugins"));
 }
-run().catch((err) => (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.setFailed)(err));
+run().catch((err) => {
+    (0,_actions_core__WEBPACK_IMPORTED_MODULE_0__.setFailed)(err);
+});
 
 })();
 

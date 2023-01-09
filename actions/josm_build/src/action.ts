@@ -113,10 +113,9 @@ async function run(): Promise<void> {
     `JOSM clone r${josmRevision}`,
     async () => await cloneJosm(josmRevision)
   );
-  await group(
-    `JOSM build r${josmRevision}`,
-    async () => await buildJosm(josmSource, josmRevision)
-  );
+  await group(`JOSM build r${josmRevision}`, async () => {
+    await buildJosm(josmSource, josmRevision);
+  });
   const josmTestRevision = await getJosmRevision(
     getInput("josm-test-revision")
   );
@@ -130,11 +129,12 @@ async function run(): Promise<void> {
       `JOSM update r${josmTestRevision}`,
       async () => await updateJosm(josmSource, josmTestRevision)
     );
-    await group(
-      `JOSM build tests r${josmTestRevision}`,
-      async () => await buildJosmTests(josmSource, josmTestRevision)
-    );
+    await group(`JOSM build tests r${josmTestRevision}`, async () => {
+      await buildJosmTests(josmSource, josmTestRevision);
+    });
   }
 }
 
-run().catch((err) => setFailed(err));
+run().catch((err) => {
+  setFailed(err);
+});

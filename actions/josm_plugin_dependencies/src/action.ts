@@ -2,7 +2,7 @@ import {
   pluginDependencies,
   downloadPluginDependencies,
 } from "./plugin-dependencies";
-import { getInput, group, info, setFailed } from "@actions/core";
+import { getInput, group, setFailed } from "@actions/core";
 import { join } from "path";
 import { saveCache, restoreCache } from "@actions/cache";
 import { context } from "@actions/github";
@@ -99,4 +99,6 @@ async function run(): Promise<void> {
   await dependencies(pluginDir);
 }
 
-run().catch((err) => setFailed(err));
+run().catch((err) => {
+  setFailed(err);
+});

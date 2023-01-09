@@ -80,7 +80,7 @@ describe("test plugin_dependencies/plugin_dependencies", () => {
     jest
       .spyOn(fs, "existsSync")
       .mockImplementation((path) => path === join(".", "gradle.properties"));
-    return await pluginDependencies(".").then((dependencies) => {
+    await pluginDependencies(".").then((dependencies) => {
       expect(dependencies).toContain("utilsplugin2");
       expect(dependencies).toContain("apache-http");
       expect(dependencies.length).toBe(2);
@@ -90,7 +90,7 @@ describe("test plugin_dependencies/plugin_dependencies", () => {
     jest
       .spyOn(fs, "existsSync")
       .mockImplementation((path) => path === join(".", "build.xml"));
-    return await pluginDependencies(".").then((dependencies) => {
+    await pluginDependencies(".").then((dependencies) => {
       expect(dependencies).toContain("utilsplugin2");
       expect(dependencies).toContain("jts");
       expect(dependencies.length).toBe(2);

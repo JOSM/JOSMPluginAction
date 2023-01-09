@@ -11,12 +11,15 @@
 %_test::
 	cd actions/$* && \
 	if [ ! -d "node_modules" ]; then npm install; fi && \
+	npm install --no-save prettier npm-check && \
 	npm run all && \
 	npx prettier --check src && \
 	npx npm-check
 
 %_prettier::
 	cd actions/$* && \
+	if [ ! -d "node_modules" ]; then npm install; fi && \
+	npm install --no-save prettier && \
 	npx prettier --write src
 
 all: josm_build_make josm_plugin_clone_make josm_plugin_dependencies_make setup-ant_make

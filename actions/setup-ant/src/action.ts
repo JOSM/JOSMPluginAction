@@ -9,4 +9,6 @@ async function run(): Promise<string> {
   return await downloadAntTool(version);
 }
 
-run().catch((err) => error(err));
+run().catch((err) => {
+  error(err);
+});
