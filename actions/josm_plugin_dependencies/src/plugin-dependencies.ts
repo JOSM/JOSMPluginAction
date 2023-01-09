@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { exec, getExecOutput } from "@actions/exec";
 import { restoreCache, saveCache } from "@actions/cache";
@@ -61,6 +61,13 @@ export async function downloadPluginDependencies(
   }
   for (const path of paths) {
     await exec("svn", ["update", path]);
+    if (!existsSync(path)) {
+      await downloadPluginDependencyFromManifest(
+        path.replace(svnDirectory, "").substring(1 /* for / */)
+      )
+        .then((blob) => Buffer.from(blob))
+        .then((blob) => writeFileSync(path, blob));
+    }
   }
   if (!Number.isNaN(maxRevision)) {
     await saveCache(
@@ -68,4 +75,23 @@ export async function downloadPluginDependencies(
       `${process.platform}-${process.arch}-${paths.join(";")}-${maxRevision}`
     );
   }
+}
+
+async function downloadPluginDependencyFromManifest(
+  path: string
+): Promise<ArrayBuffer> {
+  return fetch("https://josm.openstreetmap.de/plugin")
+    .then((result) => result.text())
+    .then((text) =>
+      text
+        .split("\n")
+        .filter(
+          (line) =>
+            /^.*.jar;.*.jar$/.exec(line) != null && line.search(path) >= 0
+        )
+    )
+    .then((lines) => lines[0])
+    .then((line) => line.split(";")[1])
+    .then((url) => fetch(url))
+    .then((response) => response.arrayBuffer());
 }
