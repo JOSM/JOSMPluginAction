@@ -2,7 +2,7 @@ name: "Ant setup"
 description: "Setup ant"
 inputs:
   ant-version:
-    default: 1.10.12
+    default: 1.10.13
     description: The version of ant to download and install
 outputs:
   ant-home:
