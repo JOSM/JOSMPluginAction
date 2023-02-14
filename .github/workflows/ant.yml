@@ -78,7 +78,7 @@ jobs:
 
     - name: Cache build
       id: cache-plugin-build
-      uses: actions/cache@v3.0.0
+      uses: actions/cache@v3
       with:
         key: ${{ github.event.repository.name }}-${{ github.sha }}
         path: |
@@ -124,7 +124,7 @@ jobs:
     - name: Cache plugin test dependencies
       id: cache-plugin-test-dependencies
       if: steps.ivy-file-check.outputs.ivy-xml == 'true'
-      uses: actions/cache@v3.0.0
+      uses: actions/cache@v3
       with:
         key: ${{ runner.os }}-${{ runner.arch }}-ivy-plugin-test-${{ hashFiles('**/ivy.xml') }}
         path: |
@@ -164,7 +164,7 @@ jobs:
     steps:
     - name: Get build
       id: cache-plugin-build
-      uses: actions/cache@v3.0.0
+      uses: actions/cache@v3
       with:
         key: ${{ github.event.repository.name }}-${{ github.sha }}
         path: |
