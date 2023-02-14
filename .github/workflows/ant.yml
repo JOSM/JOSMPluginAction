@@ -115,9 +115,9 @@ jobs:
       id: ivy-file-check
       run: |
         if [ -f "josm/plugins/${{ github.event.repository.name }}/ivy.xml" ]; then
-          echo "::set-output name=ivy-xml::true"
+          echo "ivy-xml=true" >> $GITHUB_OUTPUT
         else
-          echo "::set-output name=ivy-xml::false"
+          echo "ivy-xml=false" >> $GITHUB_OUTPUT
         fi
       shell: bash
 
