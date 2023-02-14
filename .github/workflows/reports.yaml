@@ -4,6 +4,7 @@ on:
 
 jobs:
   checks:
+    if: ${{ !github.ref_protected }}
     runs-on: ubuntu-latest
     steps:
       - name: Download Test Report
