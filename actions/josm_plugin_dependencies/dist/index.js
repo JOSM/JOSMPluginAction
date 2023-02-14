@@ -1107,14 +1107,12 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const exec_1 = __nccwpck_require__(1514);
-const core_1 = __nccwpck_require__(2186);
 const io = __importStar(__nccwpck_require__(7351));
 const fs_1 = __nccwpck_require__(7147);
 const path = __importStar(__nccwpck_require__(1017));
 const utils = __importStar(__nccwpck_require__(1518));
 const constants_1 = __nccwpck_require__(8840);
 const IS_WINDOWS = process.platform === 'win32';
-core_1.exportVariable('MSYS', 'winsymlinks:nativestrict');
 // Returns tar path and type: BSD or GNU
 function getTarPath() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -1304,7 +1302,10 @@ function execCommands(commands, cwd) {
     return __awaiter(this, void 0, void 0, function* () {
         for (const command of commands) {
             try {
-                yield exec_1.exec(command, undefined, { cwd });
+                yield exec_1.exec(command, undefined, {
+                    cwd,
+                    env: Object.assign(Object.assign({}, process.env), { MSYS: 'winsymlinks:nativestrict' })
+                });
             }
             catch (error) {
                 throw new Error(`${command.split(' ')[0]} failed with error: ${error === null || error === void 0 ? void 0 : error.message}`);
@@ -17238,10 +17239,12 @@ function deserializeState(serializedState) {
     }
 }
 function setStateError(inputs) {
-    const { state, stateProxy } = inputs;
+    const { state, stateProxy, isOperationError } = inputs;
     return (error) => {
-        stateProxy.setError(state, error);
-        stateProxy.setFailed(state);
+        if (isOperationError(error)) {
+            stateProxy.setError(state, error);
+            stateProxy.setFailed(state);
+        }
         throw error;
     };
 }
@@ -17296,10 +17299,11 @@ async function initOperation(inputs) {
     return state;
 }
 async function pollOperationHelper(inputs) {
-    const { poll, state, stateProxy, operationLocation, getOperationStatus, getResourceLocation, options, } = inputs;
+    const { poll, state, stateProxy, operationLocation, getOperationStatus, getResourceLocation, isOperationError, options, } = inputs;
     const response = await poll(operationLocation, options).catch(setStateError({
         state,
         stateProxy,
+        isOperationError,
     }));
     const status = getOperationStatus(response, state);
     logger.verbose(`LRO: Status:\n\tPolling from: ${state.config.operationLocation}\n\tOperation status: ${status}\n\tPolling status: ${terminalStates.includes(status) ? "Stopped" : "Running"}`);
@@ -17307,7 +17311,7 @@ async function pollOperationHelper(inputs) {
         const resourceLocation = getResourceLocation(response, state);
         if (resourceLocation !== undefined) {
             return {
-                response: await poll(resourceLocation).catch(setStateError({ state, stateProxy })),
+                response: await poll(resourceLocation).catch(setStateError({ state, stateProxy, isOperationError })),
                 status,
             };
         }
@@ -17316,7 +17320,7 @@ async function pollOperationHelper(inputs) {
 }
 /** Polls the long-running operation. */
 async function pollOperation(inputs) {
-    const { poll, state, stateProxy, options, getOperationStatus, getResourceLocation, getOperationLocation, withOperationLocation, getPollingInterval, processResult, updateState, setDelay, isDone, setErrorAsResult, } = inputs;
+    const { poll, state, stateProxy, options, getOperationStatus, getResourceLocation, getOperationLocation, isOperationError, withOperationLocation, getPollingInterval, processResult, updateState, setDelay, isDone, setErrorAsResult, } = inputs;
     const { operationLocation } = state.config;
     if (operationLocation !== undefined) {
         const { response, status } = await pollOperationHelper({
@@ -17326,6 +17330,7 @@ async function pollOperation(inputs) {
             stateProxy,
             operationLocation,
             getResourceLocation,
+            isOperationError,
             options,
         });
         processOperationStatus({
@@ -17582,6 +17587,9 @@ function getResourceLocation({ flatResponse }, state) {
     }
     return state.config.resourceLocation;
 }
+function isOperationError(e) {
+    return e.name === "RestError";
+}
 /** Polls the long-running operation. */
 async function pollHttpOperation(inputs) {
     const { lro, stateProxy, options, processResult, updateState, setDelay, state, setErrorAsResult, } = inputs;
@@ -17596,6 +17604,7 @@ async function pollHttpOperation(inputs) {
         getPollingInterval: parseRetryAfter,
         getOperationLocation,
         getOperationStatus,
+        isOperationError,
         getResourceLocation,
         options,
         /**
@@ -17684,7 +17693,7 @@ const createStateProxy$1 = () => ({
  * Returns a poller factory.
  */
 function buildCreatePoller(inputs) {
-    const { getOperationLocation, getStatusFromInitialResponse, getStatusFromPollResponse, getResourceLocation, getPollingInterval, resolveOnUnsuccessful, } = inputs;
+    const { getOperationLocation, getStatusFromInitialResponse, getStatusFromPollResponse, isOperationError, getResourceLocation, getPollingInterval, resolveOnUnsuccessful, } = inputs;
     return async ({ init, poll }, options) => {
         const { processResult, updateState, withOperationLocation: withOperationLocationCallback, intervalInMs = POLL_INTERVAL_IN_MS, restoreFrom, } = options || {};
         const stateProxy = createStateProxy$1();
@@ -17715,6 +17724,7 @@ function buildCreatePoller(inputs) {
         const abortController$1 = new abortController.AbortController();
         const handlers = new Map();
         const handleProgressEvents = async () => handlers.forEach((h) => h(state));
+        const cancelErrMsg = "Operation was canceled";
         let currentPollIntervalInMs = intervalInMs;
         const poller = {
             getOperationState: () => state,
@@ -17747,35 +17757,46 @@ function buildCreatePoller(inputs) {
                         await poller.poll({ abortSignal });
                     }
                 }
-                switch (state.status) {
-                    case "succeeded": {
-                        return poller.getResult();
-                    }
-                    case "canceled": {
-                        if (!resolveOnUnsuccessful)
-                            throw new Error("Operation was canceled");
-                        return poller.getResult();
-                    }
-                    case "failed": {
-                        if (!resolveOnUnsuccessful)
+                if (resolveOnUnsuccessful) {
+                    return poller.getResult();
+                }
+                else {
+                    switch (state.status) {
+                        case "succeeded":
+                            return poller.getResult();
+                        case "canceled":
+                            throw new Error(cancelErrMsg);
+                        case "failed":
                             throw state.error;
-                        return poller.getResult();
-                    }
-                    case "notStarted":
-                    case "running": {
-                        // Unreachable
-                        throw new Error(`polling completed without succeeding or failing`);
+                        case "notStarted":
+                        case "running":
+                            throw new Error(`Polling completed without succeeding or failing`);
                     }
                 }
             })().finally(() => {
                 resultPromise = undefined;
             }))),
             async poll(pollOptions) {
+                if (resolveOnUnsuccessful) {
+                    if (poller.isDone())
+                        return;
+                }
+                else {
+                    switch (state.status) {
+                        case "succeeded":
+                            return;
+                        case "canceled":
+                            throw new Error(cancelErrMsg);
+                        case "failed":
+                            throw state.error;
+                    }
+                }
                 await pollOperation({
                     poll,
                     state,
                     stateProxy,
                     getOperationLocation,
+                    isOperationError,
                     withOperationLocation,
                     getPollingInterval,
                     getOperationStatus: getStatusFromPollResponse,
@@ -17789,11 +17810,13 @@ function buildCreatePoller(inputs) {
                     setErrorAsResult: !resolveOnUnsuccessful,
                 });
                 await handleProgressEvents();
-                if (state.status === "canceled" && !resolveOnUnsuccessful) {
-                    throw new Error("Operation was canceled");
-                }
-                if (state.status === "failed" && !resolveOnUnsuccessful) {
-                    throw state.error;
+                if (!resolveOnUnsuccessful) {
+                    switch (state.status) {
+                        case "canceled":
+                            throw new Error(cancelErrMsg);
+                        case "failed":
+                            throw state.error;
+                    }
                 }
             },
         };
@@ -17813,6 +17836,7 @@ async function createHttpPoller(lro, options) {
     return buildCreatePoller({
         getStatusFromInitialResponse,
         getStatusFromPollResponse: getOperationStatus,
+        isOperationError,
         getOperationLocation,
         getResourceLocation,
         getPollingInterval: parseRetryAfter,
@@ -47163,6 +47187,7 @@ class PropagationAPI {
     constructor() {
         this.createBaggage = utils_1.createBaggage;
         this.getBaggage = context_helpers_1.getBaggage;
+        this.getActiveBaggage = context_helpers_1.getActiveBaggage;
         this.setBaggage = context_helpers_1.setBaggage;
         this.deleteBaggage = context_helpers_1.deleteBaggage;
     }
@@ -47327,12 +47352,13 @@ exports.TraceAPI = TraceAPI;
  * limitations under the License.
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.deleteBaggage = exports.setBaggage = exports.getBaggage = void 0;
-const context_1 = __nccwpck_require__(8242);
+exports.deleteBaggage = exports.setBaggage = exports.getActiveBaggage = exports.getBaggage = void 0;
+const context_1 = __nccwpck_require__(7171);
+const context_2 = __nccwpck_require__(8242);
 /**
  * Baggage key
  */
-const BAGGAGE_KEY = (0, context_1.createContextKey)('OpenTelemetry Baggage Key');
+const BAGGAGE_KEY = (0, context_2.createContextKey)('OpenTelemetry Baggage Key');
 /**
  * Retrieve the current baggage from the given context
  *
@@ -47343,6 +47369,15 @@ function getBaggage(context) {
     return context.getValue(BAGGAGE_KEY) || undefined;
 }
 exports.getBaggage = getBaggage;
+/**
+ * Retrieve the current baggage from the active/current context
+ *
+ * @returns {Baggage} Extracted baggage from the context
+ */
+function getActiveBaggage() {
+    return getBaggage(context_1.ContextAPI.getInstance().active());
+}
+exports.getActiveBaggage = getActiveBaggage;
 /**
  * Store a baggage in the given context
  *
@@ -48789,7 +48824,7 @@ const contextApi = context_1.ContextAPI.getInstance();
  */
 class NoopTracer {
     // startSpan starts a noop span.
-    startSpan(name, options, context) {
+    startSpan(name, options, context = contextApi.active()) {
         const root = Boolean(options === null || options === void 0 ? void 0 : options.root);
         if (root) {
             return new NonRecordingSpan_1.NonRecordingSpan();
@@ -49562,7 +49597,7 @@ var TraceFlags;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.VERSION = void 0;
 // this is autogenerated file, see scripts/version-update.js
-exports.VERSION = '1.3.0';
+exports.VERSION = '1.4.0';
 //# sourceMappingURL=version.js.map
 
 /***/ }),
@@ -54201,7 +54236,7 @@ const delimiter = '-'; // '\x2D'
 
 /** Regular expressions */
 const regexPunycode = /^xn--/;
-const regexNonASCII = /[^\0-\x7E]/; // non-ASCII chars
+const regexNonASCII = /[^\0-\x7F]/; // Note: U+007F DEL is excluded too.
 const regexSeparators = /[\x2E\u3002\uFF0E\uFF61]/g; // RFC 3490 separators
 
 /** Error messages */
@@ -54236,11 +54271,11 @@ function error(type) {
  * item.
  * @returns {Array} A new array of values returned by the callback function.
  */
-function map(array, fn) {
+function map(array, callback) {
 	const result = [];
 	let length = array.length;
 	while (length--) {
-		result[length] = fn(array[length]);
+		result[length] = callback(array[length]);
 	}
 	return result;
 }
@@ -54252,22 +54287,22 @@ function map(array, fn) {
  * @param {String} domain The domain name or email address.
  * @param {Function} callback The function that gets called for every
  * character.
- * @returns {Array} A new string of characters returned by the callback
+ * @returns {String} A new string of characters returned by the callback
  * function.
  */
-function mapDomain(string, fn) {
-	const parts = string.split('@');
+function mapDomain(domain, callback) {
+	const parts = domain.split('@');
 	let result = '';
 	if (parts.length > 1) {
 		// In email addresses, only the domain name should be punycoded. Leave
 		// the local part (i.e. everything up to `@`) intact.
 		result = parts[0] + '@';
-		string = parts[1];
+		domain = parts[1];
 	}
 	// Avoid `split(regex)` for IE8 compatibility. See #17.
-	string = string.replace(regexSeparators, '\x2E');
-	const labels = string.split('.');
-	const encoded = map(labels, fn).join('.');
+	domain = domain.replace(regexSeparators, '\x2E');
+	const labels = domain.split('.');
+	const encoded = map(labels, callback).join('.');
 	return result + encoded;
 }
 
@@ -54316,7 +54351,7 @@ function ucs2decode(string) {
  * @param {Array} codePoints The array of numeric code points.
  * @returns {String} The new Unicode string (UCS-2).
  */
-const ucs2encode = array => String.fromCodePoint(...array);
+const ucs2encode = codePoints => String.fromCodePoint(...codePoints);
 
 /**
  * Converts a basic code point into a digit/integer.
@@ -54328,13 +54363,13 @@ const ucs2encode = array => String.fromCodePoint(...array);
  * the code point does not represent a value.
  */
 const basicToDigit = function(codePoint) {
-	if (codePoint - 0x30 < 0x0A) {
-		return codePoint - 0x16;
+	if (codePoint >= 0x30 && codePoint < 0x3A) {
+		return 26 + (codePoint - 0x30);
 	}
-	if (codePoint - 0x41 < 0x1A) {
+	if (codePoint >= 0x41 && codePoint < 0x5B) {
 		return codePoint - 0x41;
 	}
-	if (codePoint - 0x61 < 0x1A) {
+	if (codePoint >= 0x61 && codePoint < 0x7B) {
 		return codePoint - 0x61;
 	}
 	return base;
@@ -54414,7 +54449,7 @@ const decode = function(input) {
 		// which gets added to `i`. The overflow checking is easier
 		// if we increase `i` as we go, then subtract off its starting
 		// value at the end to obtain `delta`.
-		let oldi = i;
+		const oldi = i;
 		for (let w = 1, k = base; /* no condition */; k += base) {
 
 			if (index >= inputLength) {
@@ -54423,7 +54458,10 @@ const decode = function(input) {
 
 			const digit = basicToDigit(input.charCodeAt(index++));
 
-			if (digit >= base || digit > floor((maxInt - i) / w)) {
+			if (digit >= base) {
+				error('invalid-input');
+			}
+			if (digit > floor((maxInt - i) / w)) {
 				error('overflow');
 			}
 
@@ -54477,7 +54515,7 @@ const encode = function(input) {
 	input = ucs2decode(input);
 
 	// Cache the length.
-	let inputLength = input.length;
+	const inputLength = input.length;
 
 	// Initialize the state.
 	let n = initialN;
@@ -54491,7 +54529,7 @@ const encode = function(input) {
 		}
 	}
 
-	let basicLength = output.length;
+	const basicLength = output.length;
 	let handledCPCount = basicLength;
 
 	// `handledCPCount` is the number of code points that have been handled;
@@ -54528,7 +54566,7 @@ const encode = function(input) {
 			if (currentValue < n && ++delta > maxInt) {
 				error('overflow');
 			}
-			if (currentValue == n) {
+			if (currentValue === n) {
 				// Represent delta as a generalized variable-length integer.
 				let q = delta;
 				for (let k = base; /* no condition */; k += base) {
@@ -54545,7 +54583,7 @@ const encode = function(input) {
 				}
 
 				output.push(stringFromCharCode(digitToBasic(q, 0)));
-				bias = adapt(delta, handledCPCountPlusOne, handledCPCount == basicLength);
+				bias = adapt(delta, handledCPCountPlusOne, handledCPCount === basicLength);
 				delta = 0;
 				++handledCPCount;
 			}
@@ -58199,6 +58237,10 @@ var __assign;
 var __rest;
 var __decorate;
 var __param;
+var __esDecorate;
+var __runInitializers;
+var __propKey;
+var __setFunctionName;
 var __metadata;
 var __awaiter;
 var __generator;
@@ -58284,6 +58326,51 @@ var __createBinding;
 
     __param = function (paramIndex, decorator) {
         return function (target, key) { decorator(target, key, paramIndex); }
+    };
+
+    __esDecorate = function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
+        function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
+        var kind = contextIn.kind, key = kind === "getter" ? "get" : kind === "setter" ? "set" : "value";
+        var target = !descriptorIn && ctor ? contextIn["static"] ? ctor : ctor.prototype : null;
+        var descriptor = descriptorIn || (target ? Object.getOwnPropertyDescriptor(target, contextIn.name) : {});
+        var _, done = false;
+        for (var i = decorators.length - 1; i >= 0; i--) {
+            var context = {};
+            for (var p in contextIn) context[p] = p === "access" ? {} : contextIn[p];
+            for (var p in contextIn.access) context.access[p] = contextIn.access[p];
+            context.addInitializer = function (f) { if (done) throw new TypeError("Cannot add initializers after decoration has completed"); extraInitializers.push(accept(f || null)); };
+            var result = (0, decorators[i])(kind === "accessor" ? { get: descriptor.get, set: descriptor.set } : descriptor[key], context);
+            if (kind === "accessor") {
+                if (result === void 0) continue;
+                if (result === null || typeof result !== "object") throw new TypeError("Object expected");
+                if (_ = accept(result.get)) descriptor.get = _;
+                if (_ = accept(result.set)) descriptor.set = _;
+                if (_ = accept(result.init)) initializers.push(_);
+            }
+            else if (_ = accept(result)) {
+                if (kind === "field") initializers.push(_);
+                else descriptor[key] = _;
+            }
+        }
+        if (target) Object.defineProperty(target, contextIn.name, descriptor);
+        done = true;
+    };
+
+    __runInitializers = function (thisArg, initializers, value) {
+        var useValue = arguments.length > 2;
+        for (var i = 0; i < initializers.length; i++) {
+            value = useValue ? initializers[i].call(thisArg, value) : initializers[i].call(thisArg);
+        }
+        return useValue ? value : void 0;
+    };
+
+    __propKey = function (x) {
+        return typeof x === "symbol" ? x : "".concat(x);
+    };
+
+    __setFunctionName = function (f, name, prefix) {
+        if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
+        return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
     };
 
     __metadata = function (metadataKey, metadataValue) {
@@ -58418,7 +58505,7 @@ var __createBinding;
     __asyncDelegator = function (o) {
         var i, p;
         return i = {}, verb("next"), verb("throw", function (e) { throw e; }), verb("return"), i[Symbol.iterator] = function () { return this; }, i;
-        function verb(n, f) { i[n] = o[n] ? function (v) { return (p = !p) ? { value: __await(o[n](v)), done: n === "return" } : f ? f(v) : v; } : f; }
+        function verb(n, f) { i[n] = o[n] ? function (v) { return (p = !p) ? { value: __await(o[n](v)), done: false } : f ? f(v) : v; } : f; }
     };
 
     __asyncValues = function (o) {
@@ -58475,6 +58562,10 @@ var __createBinding;
     exporter("__rest", __rest);
     exporter("__decorate", __decorate);
     exporter("__param", __param);
+    exporter("__esDecorate", __esDecorate);
+    exporter("__runInitializers", __runInitializers);
+    exporter("__propKey", __propKey);
+    exporter("__setFunctionName", __setFunctionName);
     exporter("__metadata", __metadata);
     exporter("__awaiter", __awaiter);
     exporter("__generator", __generator);
@@ -66876,6 +66967,35 @@ module.exports = JSON.parse('[[[0,44],"disallowed_STD3_valid"],[[45,46],"valid"]
 /******/ 	}
 /******/ 	
 /************************************************************************/
+/******/ 	/* webpack/runtime/compat get default export */
+/******/ 	(() => {
+/******/ 		// getDefaultExport function for compatibility with non-harmony modules
+/******/ 		__nccwpck_require__.n = (module) => {
+/******/ 			var getter = module && module.__esModule ?
+/******/ 				() => (module['default']) :
+/******/ 				() => (module);
+/******/ 			__nccwpck_require__.d(getter, { a: getter });
+/******/ 			return getter;
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__nccwpck_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__nccwpck_require__.o(definition, key) && !__nccwpck_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__nccwpck_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/ 	
 /******/ 	/* webpack/runtime/make namespace object */
 /******/ 	(() => {
 /******/ 		// define __esModule on exports
@@ -66907,7 +67027,11 @@ var external_path_ = __nccwpck_require__(1017);
 var exec = __nccwpck_require__(1514);
 // EXTERNAL MODULE: ./node_modules/@actions/cache/lib/cache.js
 var cache = __nccwpck_require__(7799);
+// EXTERNAL MODULE: ./node_modules/node-fetch/lib/index.js
+var lib = __nccwpck_require__(467);
+var lib_default = /*#__PURE__*/__nccwpck_require__.n(lib);
 ;// CONCATENATED MODULE: ./src/plugin-dependencies.ts
+
 
 
 
@@ -66968,14 +67092,14 @@ async function downloadPluginDependencies(svnDirectory, dependencies) {
     }
 }
 async function downloadPluginDependencyFromManifest(path) {
-    return await fetch("https://josm.openstreetmap.de/plugin")
+    return await lib_default()("https://josm.openstreetmap.de/plugin")
         .then(async (result) => await result.text())
         .then((text) => text
         .split("\n")
         .filter((line) => /^.*.jar;.*.jar$/.exec(line) != null && line.search(path) >= 0))
         .then((lines) => lines[0])
         .then((line) => line.split(";")[1])
-        .then(async (url) => await fetch(url))
+        .then(async (url) => await lib_default()(url))
         .then(async (response) => await response.arrayBuffer());
 }
 

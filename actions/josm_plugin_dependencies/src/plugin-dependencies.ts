@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { exec, getExecOutput } from "@actions/exec";
 import { restoreCache, saveCache } from "@actions/cache";
+import fetch from "node-fetch";
 
 export async function pluginDependencies(directory: string): Promise<string[]> {
   if (existsSync(join(directory, "gradle.properties"))) {
