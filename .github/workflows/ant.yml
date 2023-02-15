@@ -74,13 +74,22 @@ jobs:
         josm-revision: ${{ needs.josm-build.outputs.josm-revision }}
         josm-test-revision: ${{ needs.josm-build.outputs.josm-test-revision }}
         plugin-jar-name: ${{ inputs.plugin-jar-name }}
-
-
+        fetch-depth: 0
+    - name: Set version information
+      id: version
+      run: |
+        cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
+        if [ $GITHUB_REF_TYPE == "tag" ]; then
+          version=$GITHUB_REF_NAME
+        else
+          version="$(git describe --tags --always --dirty --broken)"
+        fi
+        echo "version=${version#v}" >> $GITHUB_OUTPUT
     - name: Cache build
       id: cache-plugin-build
       uses: actions/cache@v3
       with:
-        key: ${{ github.event.repository.name }}-${{ github.sha }}
+        key: ${{ github.event.repository.name }}-${{ github.sha }}-${{ steps.version.outputs.version }}
         path: |
           josm/dist/${{ inputs.plugin-jar-name }}.jar
           josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
@@ -89,13 +98,7 @@ jobs:
     - name: Build with Ant
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
-        if [ $GITHUB_REF_TYPE == "tag" ]; then
-          version=$GITHUB_REF_NAME
-        else
-          version="$GITHUB_REF_NAME-$GITHUB_SHA"
-        fi
-
-        ant -noinput -buildfile build.xml -Dplugin.version=$version
+        ant -noinput -buildfile build.xml -Dplugin.version=${{ steps.version.outputs.version }}
 
   plugin-test:
     runs-on: ${{ inputs.operating-system }}

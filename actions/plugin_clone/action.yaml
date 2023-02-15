@@ -21,6 +21,10 @@ inputs:
     default: ${{ github.event.repository.name }}
     description: "The base name for the jar file if it does not match the repository name. Example: josm-foo where the jar is foo.jar would pass foo to this action."
     required: false
+  fetch-depth:
+    default: '1'
+    required: false
+    description: "The number of commits to fetch. 0 indicates all history for all branches and tags. Default: 1"
 
 outputs:
   plugin-directory:
@@ -43,6 +47,7 @@ runs:
   - uses: actions/checkout@v3
     with:
       path: ${{ steps.josm-plugin-clone.outputs.plugin-dir }}/${{ github.event.repository.name }}
+      fetch-depth: ${{ inputs.fetch-depth }}
   - name: Get plugin dependencies
     uses: JOSM/JOSMPluginAction/actions/josm_plugin_dependencies@v1
     with:
