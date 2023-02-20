@@ -1,0 +1,1 @@
+../../pmd/src/logProblems.ts

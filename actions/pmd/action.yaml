@@ -1,0 +1,14 @@
+name: "PMD"
+description: "Read PMD and add annotations"
+inputs:
+  src:
+    required: false
+    default: "src"
+    description: "The root source directory for the PMD file. Defaults to `src` (example: `src/org/openstreetmap/josm/gui/MainApplication.java`)."
+  file:
+    required: true
+    description: The PMD file to parse and upload
+
+runs:
+  using: "node16"
+  main: "dist/index.js"

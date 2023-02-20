@@ -18,7 +18,7 @@
     "@actions/exec": "^1.1.1",
     "@actions/github": "^5.1.1",
     "@actions/glob": "^0.4.0",
-    "node-fetch": "^2.6.9"
+    "node-fetch": "^3.3.0"
   },
   "devDependencies": {
     "@jest/globals": "^29.2.2",
@@ -27,7 +27,7 @@
     "@vercel/ncc": "^0.36.0",
     "eslint": "^8.26.0",
     "eslint-config-prettier": "^8.5.0",
-    "eslint-config-standard-with-typescript": "^26.0.0",
+    "eslint-config-standard-with-typescript": "^34.0.0",
     "eslint-plugin-import": "^2.26.0",
     "eslint-plugin-n": "^15.3.0",
     "eslint-plugin-promise": "^6.1.1",
