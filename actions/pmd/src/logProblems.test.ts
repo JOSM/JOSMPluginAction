@@ -4,20 +4,20 @@ import { logProblems } from "./action";
 describe("Test action/logProblems", function () {
   test("Simple logging", () => {
     const log = jest.spyOn(core, "error");
-    logProblems([
-      {
-        file: "org/openstreetmap/josm/actions/JoinAreasAction.java",
-        startColumn: 23,
-        endColumn: 26,
-        startLine: 1349,
-        endLine: 1349,
-        title: "Best Practices/UnusedLocalVariable",
-        info: "https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable",
-      },
-    ]);
+    const problem = {
+      file: "org/openstreetmap/josm/actions/JoinAreasAction.java",
+      startColumn: 23,
+      endColumn: 26,
+      startLine: 1349,
+      endLine: 1349,
+      title: "Best Practices/UnusedLocalVariable",
+      info: "https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable",
+    };
+    logProblems([problem]);
     expect(log).toBeCalledTimes(1);
     expect(log).toBeCalledWith(
-      "file=org/openstreetmap/josm/actions/JoinAreasAction.java,line=1349,endLine=1349,col=23,endColumn=26,title=Best Practices/UnusedLocalVariable::https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable"
+      "https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable",
+      problem
     );
   });
 });

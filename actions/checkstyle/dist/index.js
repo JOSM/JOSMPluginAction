@@ -7562,6 +7562,12 @@ function logProblems(problems) {
     for (const problem of problems) {
         (0,lib_core.error)(problem.info !== undefined && problem.info !== null ? problem.info : "", problem);
     }
+    if (problems.length == 1) {
+        (0,lib_core.setFailed)(`There was ${problems.length} problem.`);
+    }
+    else if (problems.length > 0) {
+        (0,lib_core.setFailed)(`There were ${problems.length} problems.`);
+    }
 }
 
 // EXTERNAL MODULE: external "path"

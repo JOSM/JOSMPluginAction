@@ -4874,6 +4874,12 @@ function logProblems(problems) {
     for (const problem of problems) {
         (0,core.error)(problem.info !== undefined && problem.info !== null ? problem.info : "", problem);
     }
+    if (problems.length == 1) {
+        (0,core.setFailed)(`There was ${problems.length} problem.`);
+    }
+    else if (problems.length > 0) {
+        (0,core.setFailed)(`There were ${problems.length} problems.`);
+    }
 }
 
 ;// CONCATENATED MODULE: ./src/action.ts
