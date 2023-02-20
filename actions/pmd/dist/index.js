@@ -4919,8 +4919,10 @@ function parseData(sourceDirectory, data) {
     const parsed = parser.parse(data);
     const files = parsed["pmd"]["file"];
     let problems = [];
-    for (const file of files) {
-        problems = problems.concat(parseFile(sourceDirectory, file));
+    if (files !== undefined && files !== null) {
+        for (const file of files) {
+            problems = problems.concat(parseFile(sourceDirectory, file));
+        }
     }
     return problems;
 }

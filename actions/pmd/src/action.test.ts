@@ -37,7 +37,15 @@ Avoid unused local variables such as 'spec'.
 </file>
 </pmd>`;
 
+const JOSM_EXAMPLE_NO_VIOLATIONS = `<?xml version="1.0" encoding="UTF-8"?>
+<pmd xmlns="http://pmd.sourceforge.net/report/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pmd.sourceforge.net/report/2.0.0 http://pmd.sourceforge.net/report_2_0_0.xsd" version="6.53.0" timestamp="2023-02-20T21:55:58.809">
+</pmd>`;
+
 describe("Test action/parseData", () => {
+  test("JOSM Sample XML, no issues", () => {
+    const problems = parseData("", JOSM_EXAMPLE_NO_VIOLATIONS);
+    expect(problems.length).toBe(0);
+  });
   test("JOSM Sample XML, single file", () => {
     const problems = parseData("", JOSM_SINGLE_EXAMPLE);
     expect(problems.length).toBe(1);
