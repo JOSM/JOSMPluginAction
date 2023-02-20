@@ -1,12 +1,20 @@
 import { getInput, setFailed } from "@actions/core";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { XMLParser } from "fast-xml-parser";
 import { Problem } from "./problem";
 import { logProblems } from "./logProblems";
 import { sep, join } from "path";
 
 function parseFile(trim: number, fileData: Object): Problem[] {
-  const subFile = fileData["@_name"].split(sep).slice(trim);
+  let subFile = fileData["@_name"].split(sep);
+  let currentlyTrimmed = 0;
+  while (!existsSync(join(...subFile))) {
+    subFile = subFile.slice(1);
+    currentlyTrimmed += 1;
+    if (currentlyTrimmed >= trim) {
+      break;
+    }
+  }
   const file = join(...subFile);
   const violations = fileData["error"];
   const problems: Problem[] = [];

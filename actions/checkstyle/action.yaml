@@ -3,7 +3,7 @@ description: "Read Checkstyle and add annotations"
 inputs:
   pathTrim:
     required: false
-    description: "The path separator elements to remove from the front of a checkstyle path. Defaults to the number of parent components of the path that the action is run in."
+    description: "The path separator elements to remove from the front of a checkstyle path. Defaults to the number of parent components of the path that the action is run in. This is a fallback (use if you haven't checkout the source code for your project)."
   file:
     required: true
     description: The checkstyle file to parse and upload

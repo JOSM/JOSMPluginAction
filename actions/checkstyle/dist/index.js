@@ -7433,7 +7433,15 @@ var external_path_ = __nccwpck_require__(1017);
 
 
 function parseFile(trim, fileData) {
-    const subFile = fileData["@_name"].split(external_path_.sep).slice(trim);
+    let subFile = fileData["@_name"].split(external_path_.sep);
+    let currentlyTrimmed = 0;
+    while (!(0,external_fs_.existsSync)((0,external_path_.join)(...subFile))) {
+        subFile = subFile.slice(1);
+        currentlyTrimmed += 1;
+        if (currentlyTrimmed >= trim) {
+            break;
+        }
+    }
     const file = (0,external_path_.join)(...subFile);
     const violations = fileData["error"];
     const problems = [];
