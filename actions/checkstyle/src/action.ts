@@ -1,4 +1,4 @@
-import { getInput, setFailed } from "@actions/core";
+import { debug, getInput, setFailed } from "@actions/core";
 import { readFileSync, existsSync } from "fs";
 import { XMLParser } from "fast-xml-parser";
 import { Problem } from "./problem";
@@ -66,9 +66,11 @@ async function run(): Promise<void> {
     trim = parseInt(pathTrim);
   }
   const data = readFileSync(checkstyleFile);
+  debug(data.toString());
   logProblems(parseData(trim, data));
 }
 
 if (require.main === module) {
+  debug("Running main");
   run().catch((err) => setFailed(err));
 }

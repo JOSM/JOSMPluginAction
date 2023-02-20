@@ -7490,9 +7490,11 @@ async function run() {
         trim = parseInt(pathTrim);
     }
     const data = (0,external_fs_.readFileSync)(checkstyleFile);
+    (0,core.debug)(data.toString());
     logProblems(parseData(trim, data));
 }
 if (__nccwpck_require__.c[__nccwpck_require__.s] === module) {
+    (0,core.debug)("Running main");
     run().catch((err) => (0,core.setFailed)(err));
 }
 

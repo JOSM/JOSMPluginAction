@@ -4782,10 +4782,15 @@ async function run() {
     const pmdFile = (0,core.getInput)("file");
     const sourceDir = (0,core.getInput)("src");
     const data = (0,external_fs_.readFileSync)(pmdFile);
+    (0,core.debug)(data.toString());
     logProblems(parseData(sourceDir, data));
 }
 if (__nccwpck_require__.c[__nccwpck_require__.s] === module) {
+    (0,core.debug)("Running main");
     run().catch((err) => (0,core.setFailed)(err));
+}
+else {
+    (0,core.debug)("Not running main");
 }
 
 

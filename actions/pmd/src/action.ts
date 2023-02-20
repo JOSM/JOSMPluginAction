@@ -1,4 +1,4 @@
-import { getInput, setFailed } from "@actions/core";
+import { debug, getInput, setFailed } from "@actions/core";
 import { readFileSync } from "fs";
 import { XMLParser } from "fast-xml-parser";
 import { logProblems } from "./logProblems";
@@ -52,9 +52,13 @@ async function run(): Promise<void> {
   const pmdFile = getInput("file");
   const sourceDir = getInput("src");
   const data = readFileSync(pmdFile);
+  debug(data.toString());
   logProblems(parseData(sourceDir, data));
 }
 
 if (require.main === module) {
+  debug("Running main");
   run().catch((err) => setFailed(err));
+} else {
+  debug("Not running main");
 }
