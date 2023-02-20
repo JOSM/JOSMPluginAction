@@ -19,9 +19,9 @@ describe("Test action/parseData", () => {
     expectProblem(
       {
         file: "test/unit/org/openstreetmap/josm/tools/bugreport/BugReportTest.java",
-        column: 101,
+        startColumn: 101,
         endColumn: 101,
-        line: 141,
+        startLine: 141,
         endLine: 141,
         title:
           "com.puppycrawl.tools.checkstyle.checks.whitespace.WhitespaceAroundCheck",

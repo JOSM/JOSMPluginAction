@@ -28,9 +28,9 @@ function parseFile(trim: number, fileData: Object): Problem[] {
       problems.push({
         file: file,
         title: title,
-        column: parseInt(violation["@_column"]),
+        startColumn: parseInt(violation["@_column"]),
         endColumn: parseInt(violation["@_column"]),
-        line: parseInt(violation["@_line"]),
+        startLine: parseInt(violation["@_line"]),
         endLine: parseInt(violation["@_line"]),
         info: violation["@_message"],
       });

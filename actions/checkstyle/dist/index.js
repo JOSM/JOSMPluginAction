@@ -7560,20 +7560,7 @@ var lib_core = __nccwpck_require__(6435);
 
 function logProblems(problems) {
     for (const problem of problems) {
-        (0,lib_core.error)("file=" +
-            problem.file +
-            ",line=" +
-            problem.line +
-            ",endLine=" +
-            problem.endLine +
-            ",col=" +
-            problem.column +
-            ",endColumn=" +
-            problem.endColumn +
-            ",title=" +
-            problem.title +
-            "::" +
-            problem.info);
+        (0,lib_core.error)(problem.info !== undefined && problem.info !== null ? problem.info : "", problem);
     }
 }
 
@@ -7606,9 +7593,9 @@ function parseFile(trim, fileData) {
             problems.push({
                 file: file,
                 title: title,
-                column: parseInt(violation["@_column"]),
+                startColumn: parseInt(violation["@_column"]),
                 endColumn: parseInt(violation["@_column"]),
-                line: parseInt(violation["@_line"]),
+                startLine: parseInt(violation["@_line"]),
                 endLine: parseInt(violation["@_line"]),
                 info: violation["@_message"],
             });

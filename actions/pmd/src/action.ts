@@ -18,9 +18,9 @@ function parseFile(sourceDirectory: string, fileData: Object): Problem[] {
     problems.push({
       file: file,
       title: title,
-      column: parseInt(violation["@_begincolumn"]),
+      startColumn: parseInt(violation["@_begincolumn"]),
       endColumn: parseInt(violation["@_endcolumn"]),
-      line: parseInt(violation["@_beginline"]),
+      startLine: parseInt(violation["@_beginline"]),
       endLine: parseInt(violation["@_endline"]),
       info: violation["@_externalInfoUrl"],
     });

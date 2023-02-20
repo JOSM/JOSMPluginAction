@@ -44,9 +44,9 @@ describe("Test action/parseData", () => {
     expectProblem(
       {
         file: "org/openstreetmap/josm/actions/JoinAreasAction.java",
-        column: 23,
+        startColumn: 23,
         endColumn: 26,
-        line: 1339,
+        startLine: 1339,
         endLine: 1339,
         title: "Best Practices/UnusedLocalVariable",
         info: "https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable",
@@ -60,9 +60,9 @@ describe("Test action/parseData", () => {
     expectProblem(
       {
         file: "org/openstreetmap/josm/actions/JoinAreasAction.java",
-        column: 23,
+        startColumn: 23,
         endColumn: 26,
-        line: 1339,
+        startLine: 1339,
         endLine: 1339,
         title: "Best Practices/UnusedLocalVariable",
         info: "https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable",
@@ -72,9 +72,9 @@ describe("Test action/parseData", () => {
     expectProblem(
       {
         file: "org/openstreetmap/josm/tools/ExceptionUtil.java",
-        column: 23,
+        startColumn: 23,
         endColumn: 26,
-        line: 71,
+        startLine: 71,
         endLine: 71,
         title: "Best Practices/UnusedLocalVariable",
         info: "https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable",
@@ -88,9 +88,9 @@ describe("Test action/parseData", () => {
     expectProblem(
       {
         file: "org/openstreetmap/josm/actions/JoinAreasAction.java",
-        column: 23,
+        startColumn: 23,
         endColumn: 26,
-        line: 1339,
+        startLine: 1339,
         endLine: 1339,
         title: "Best Practices/UnusedLocalVariable",
         info: "https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable",
@@ -100,9 +100,9 @@ describe("Test action/parseData", () => {
     expectProblem(
       {
         file: "org/openstreetmap/josm/actions/JoinAreasAction.java",
-        column: 23,
+        startColumn: 23,
         endColumn: 26,
-        line: 1349,
+        startLine: 1349,
         endLine: 1349,
         title: "Best Practices/UnusedLocalVariable",
         info: "https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable",
