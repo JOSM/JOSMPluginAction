@@ -66,7 +66,7 @@ Use a specific java distribution for running the action. Defaults to `temurin`.
 ## Environment variables
 ### `ANT_HOME`
 This sets both the `ant` home, but do note that it is used to download the
-specified `ant` version. Defaults to `apache-ant-1.10.12`. You should generally
+specified `ant` version. Defaults to `apache-ant-1.10.13`. You should generally
 avoid changing this environment variable. Open a pull request first.
 
 # License

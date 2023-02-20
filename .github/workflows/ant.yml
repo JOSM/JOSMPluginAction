@@ -35,7 +35,7 @@ on:
         required: false
       ant-version:
         type: string
-        default: 'apache-ant-1.10.12'
+        default: 'apache-ant-1.10.13'
     secrets:
       trac-username:
         description: The username to update Trac PluginsSource with (deprecated)
