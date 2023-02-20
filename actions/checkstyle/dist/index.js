@@ -7382,125 +7382,6 @@ exports["default"] = _default;
 
 /***/ }),
 
-/***/ 2190:
-/***/ ((module, __webpack_exports__, __nccwpck_require__) => {
-
-"use strict";
-// ESM COMPAT FLAG
-__nccwpck_require__.r(__webpack_exports__);
-
-// EXPORTS
-__nccwpck_require__.d(__webpack_exports__, {
-  "parseData": () => (/* binding */ parseData)
-});
-
-// EXTERNAL MODULE: ./node_modules/@actions/core/lib/core.js
-var core = __nccwpck_require__(2186);
-// EXTERNAL MODULE: external "fs"
-var external_fs_ = __nccwpck_require__(7147);
-// EXTERNAL MODULE: ./node_modules/fast-xml-parser/src/fxp.js
-var fxp = __nccwpck_require__(2603);
-// EXTERNAL MODULE: ../pmd/node_modules/@actions/core/lib/core.js
-var lib_core = __nccwpck_require__(6435);
-;// CONCATENATED MODULE: ../pmd/src/logProblems.ts
-
-function logProblems(problems) {
-    for (const problem of problems) {
-        (0,lib_core.error)("file=" +
-            problem.file +
-            ",line=" +
-            problem.line +
-            ",endLine=" +
-            problem.endLine +
-            ",col=" +
-            problem.column +
-            ",endColumn=" +
-            problem.endColumn +
-            ",title=" +
-            problem.title +
-            "::" +
-            problem.info);
-    }
-}
-
-// EXTERNAL MODULE: external "path"
-var external_path_ = __nccwpck_require__(1017);
-;// CONCATENATED MODULE: ./src/action.ts
-/* module decorator */ module = __nccwpck_require__.hmd(module);
-
-
-
-
-
-function parseFile(trim, fileData) {
-    let subFile = fileData["@_name"].split(external_path_.sep);
-    let currentlyTrimmed = 0;
-    while (!(0,external_fs_.existsSync)((0,external_path_.join)(...subFile))) {
-        subFile = subFile.slice(1);
-        currentlyTrimmed += 1;
-        if (currentlyTrimmed >= trim) {
-            break;
-        }
-    }
-    const file = (0,external_path_.join)(...subFile);
-    const violations = fileData["error"];
-    const problems = [];
-    if (violations !== undefined &&
-        violations !== null &&
-        violations.length !== 0) {
-        for (const violation of violations) {
-            const title = violation["@_source"];
-            problems.push({
-                file: file,
-                title: title,
-                column: parseInt(violation["@_column"]),
-                endColumn: parseInt(violation["@_column"]),
-                line: parseInt(violation["@_line"]),
-                endLine: parseInt(violation["@_line"]),
-                info: violation["@_message"],
-            });
-        }
-    }
-    return problems;
-}
-function parseData(trim, data) {
-    const alwaysArray = ["checkstyle.file", "checkstyle.file.error"];
-    const parser = new fxp.XMLParser({
-        ignoreAttributes: false,
-        isArray: (name, jpath) => {
-            return alwaysArray.indexOf(jpath) >= 0;
-        },
-    });
-    const parsed = parser.parse(data);
-    const files = parsed["checkstyle"]["file"];
-    let problems = [];
-    for (const file of files) {
-        problems = problems.concat(parseFile(trim, file));
-    }
-    return problems;
-}
-async function run() {
-    const checkstyleFile = (0,core.getInput)("file");
-    const pathTrim = (0,core.getInput)("pathTrim");
-    let trim;
-    if (pathTrim === "") {
-        trim = process.cwd().split(external_path_.sep).length;
-    }
-    else {
-        trim = parseInt(pathTrim);
-    }
-    const data = (0,external_fs_.readFileSync)(checkstyleFile);
-    (0,core.debug)(data.toString());
-    logProblems(parseData(trim, data));
-}
-if (__nccwpck_require__.c[__nccwpck_require__.s] === module) {
-    (0,core.debug)("Running main");
-    run().catch((err) => (0,core.setFailed)(err));
-}
-
-
-/***/ }),
-
 /***/ 9491:
 /***/ ((module) => {
 
@@ -7603,8 +7484,8 @@ module.exports = require("util");
 /******/ 		}
 /******/ 		// Create a new module (and put it into the cache)
 /******/ 		var module = __webpack_module_cache__[moduleId] = {
-/******/ 			id: moduleId,
-/******/ 			loaded: false,
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
 /******/ 			exports: {}
 /******/ 		};
 /******/ 	
@@ -7617,15 +7498,9 @@ module.exports = require("util");
 /******/ 			if(threw) delete __webpack_module_cache__[moduleId];
 /******/ 		}
 /******/ 	
-/******/ 		// Flag the module as loaded
-/******/ 		module.loaded = true;
-/******/ 	
 /******/ 		// Return the exports of the module
 /******/ 		return module.exports;
 /******/ 	}
-/******/ 	
-/******/ 	// expose the module cache
-/******/ 	__nccwpck_require__.c = __webpack_module_cache__;
 /******/ 	
 /************************************************************************/
 /******/ 	/* webpack/runtime/define property getters */
@@ -7637,21 +7512,6 @@ module.exports = require("util");
 /******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
 /******/ 				}
 /******/ 			}
-/******/ 		};
-/******/ 	})();
-/******/ 	
-/******/ 	/* webpack/runtime/harmony module decorator */
-/******/ 	(() => {
-/******/ 		__nccwpck_require__.hmd = (module) => {
-/******/ 			module = Object.create(module);
-/******/ 			if (!module.children) module.children = [];
-/******/ 			Object.defineProperty(module, 'exports', {
-/******/ 				enumerable: true,
-/******/ 				set: () => {
-/******/ 					throw new Error('ES Modules may not assign module.exports or exports.*, Use ESM export syntax, instead: ' + module.id);
-/******/ 				}
-/******/ 			});
-/******/ 			return module;
 /******/ 		};
 /******/ 	})();
 /******/ 	
@@ -7676,12 +7536,120 @@ module.exports = require("util");
 /******/ 	if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = __dirname + "/";
 /******/ 	
 /************************************************************************/
-/******/ 	
-/******/ 	// module cache are used so entry inlining is disabled
-/******/ 	// startup
-/******/ 	// Load entry module and return exports
-/******/ 	var __webpack_exports__ = __nccwpck_require__(__nccwpck_require__.s = 2190);
-/******/ 	module.exports = __webpack_exports__;
-/******/ 	
+var __webpack_exports__ = {};
+// This entry need to be wrapped in an IIFE because it need to be in strict mode.
+(() => {
+"use strict";
+// ESM COMPAT FLAG
+__nccwpck_require__.r(__webpack_exports__);
+
+// EXPORTS
+__nccwpck_require__.d(__webpack_exports__, {
+  "parseData": () => (/* binding */ parseData)
+});
+
+// EXTERNAL MODULE: ./node_modules/@actions/core/lib/core.js
+var core = __nccwpck_require__(2186);
+// EXTERNAL MODULE: external "fs"
+var external_fs_ = __nccwpck_require__(7147);
+// EXTERNAL MODULE: ./node_modules/fast-xml-parser/src/fxp.js
+var fxp = __nccwpck_require__(2603);
+// EXTERNAL MODULE: ../pmd/node_modules/@actions/core/lib/core.js
+var lib_core = __nccwpck_require__(6435);
+;// CONCATENATED MODULE: ../pmd/src/logProblems.ts
+
+function logProblems(problems) {
+    for (const problem of problems) {
+        (0,lib_core.error)("file=" +
+            problem.file +
+            ",line=" +
+            problem.line +
+            ",endLine=" +
+            problem.endLine +
+            ",col=" +
+            problem.column +
+            ",endColumn=" +
+            problem.endColumn +
+            ",title=" +
+            problem.title +
+            "::" +
+            problem.info);
+    }
+}
+
+// EXTERNAL MODULE: external "path"
+var external_path_ = __nccwpck_require__(1017);
+;// CONCATENATED MODULE: ./src/action.ts
+
+
+
+
+
+function parseFile(trim, fileData) {
+    let subFile = fileData["@_name"].split(external_path_.sep);
+    let currentlyTrimmed = 0;
+    while (!(0,external_fs_.existsSync)((0,external_path_.join)(...subFile))) {
+        subFile = subFile.slice(1);
+        currentlyTrimmed += 1;
+        if (currentlyTrimmed >= trim) {
+            break;
+        }
+    }
+    const file = (0,external_path_.join)(...subFile);
+    const violations = fileData["error"];
+    const problems = [];
+    if (violations !== undefined &&
+        violations !== null &&
+        violations.length !== 0) {
+        for (const violation of violations) {
+            const title = violation["@_source"];
+            problems.push({
+                file: file,
+                title: title,
+                column: parseInt(violation["@_column"]),
+                endColumn: parseInt(violation["@_column"]),
+                line: parseInt(violation["@_line"]),
+                endLine: parseInt(violation["@_line"]),
+                info: violation["@_message"],
+            });
+        }
+    }
+    return problems;
+}
+function parseData(trim, data) {
+    const alwaysArray = ["checkstyle.file", "checkstyle.file.error"];
+    const parser = new fxp.XMLParser({
+        ignoreAttributes: false,
+        isArray: (name, jpath) => {
+            return alwaysArray.indexOf(jpath) >= 0;
+        },
+    });
+    const parsed = parser.parse(data);
+    const files = parsed["checkstyle"]["file"];
+    let problems = [];
+    for (const file of files) {
+        problems = problems.concat(parseFile(trim, file));
+    }
+    return problems;
+}
+async function run() {
+    const checkstyleFile = (0,core.getInput)("file");
+    const pathTrim = (0,core.getInput)("pathTrim");
+    let trim;
+    if (pathTrim === "") {
+        trim = process.cwd().split(external_path_.sep).length;
+    }
+    else {
+        trim = parseInt(pathTrim);
+    }
+    const data = (0,external_fs_.readFileSync)(checkstyleFile);
+    (0,core.debug)(data.toString());
+    logProblems(parseData(trim, data));
+}
+run().catch((err) => (0,core.setFailed)(err));
+
+})();
+
+module.exports = __webpack_exports__;
 /******/ })()
 ;

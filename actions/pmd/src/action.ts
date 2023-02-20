@@ -56,9 +56,4 @@ async function run(): Promise<void> {
   logProblems(parseData(sourceDir, data));
 }
 
-if (require.main === module) {
-  debug("Running main");
-  run().catch((err) => setFailed(err));
-} else {
-  debug("Not running main");
-}
+run().catch((err) => setFailed(err));
