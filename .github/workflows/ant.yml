@@ -23,11 +23,6 @@ on:
         default: temurin
         description: The java distribution to build against
         required: false
-      update-pluginssource:
-        type: boolean
-        default: false
-        required: false
-        description: Update the PluginsSource wiki page with a new URL.
       plugin-jar-name:
         type: string
         default: ${{ github.event.repository.name }}
@@ -36,13 +31,11 @@ on:
       ant-version:
         type: string
         default: 'apache-ant-1.10.13'
-    secrets:
-      trac-username:
-        description: The username to update Trac PluginsSource with (deprecated)
+      perform-revision-tagging:
+        type: boolean
+        default: false
         required: false
-      trac-password:
-        description: The password to update Trac PluginsSource with (deprecated)
-        required: false
+        description: "Set to true if you want to automatically tag every push to the main branch for use with releasing"
 
 jobs:
   josm-build:
@@ -60,9 +53,28 @@ jobs:
       with:
         josm-revision: ${{ inputs.josm-revision }}
 
+  create_tag:
+    runs-on: ${{ inputs.operating-system }}
+    outputs:
+      revision: ${{ steps.create_revision.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v3
+        if: ${{ inputs.perform-revision-tagging }}
+        with:
+          fetch-depth: 0
+      - name: Set revision env variable
+        if: ${{ inputs.perform-revision-tagging }}
+        id: create_revision
+        # Count the total commits for this branch
+        run: |
+          revision="v$(git rev-list --count HEAD)"
+          git tag $revision
+          git push -u origin $revision
+          echo "revision=$revision" >> $GITHUB_OUTPUT
+
   plugin-build:
     runs-on: ${{ inputs.operating-system }}
-    needs: josm-build
+    needs: [josm-build, create_tag]
     steps:
     - uses: JOSM/JOSMPluginAction/actions/setup-ant@v1
       with:
@@ -85,20 +97,21 @@ jobs:
           version="$(git describe --tags --always --dirty --broken)"
         fi
         echo "version=${version#v}" >> $GITHUB_OUTPUT
-    - name: Cache build
-      id: cache-plugin-build
-      uses: actions/cache@v3
-      with:
-        key: ${{ github.event.repository.name }}-${{ github.sha }}-${{ steps.version.outputs.version }}
-        path: |
-          josm/dist/${{ inputs.plugin-jar-name }}.jar
-          josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
-          josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
 
     - name: Build with Ant
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
         ant -noinput -buildfile build.xml -Dplugin.version=${{ steps.version.outputs.version }}
+
+    - name: Upload plugin build
+      id: cache-plugin-build
+      uses: actions/upload-artifact@v3
+      with:
+        name: plugin-build
+        path: |
+          josm/dist/${{ inputs.plugin-jar-name }}.jar
+          josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
+          josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
 
   plugin-test:
     runs-on: ${{ inputs.operating-system }}
@@ -163,26 +176,46 @@ jobs:
 
   release:
     runs-on: ${{ inputs.operating-system }}
-    needs: [plugin-build, plugin-test]
+    needs: [create_tag, plugin-build, plugin-test]
+    if: ${{ startsWith(github.ref, 'refs/tags/') || inputs.perform-revision-tagging }}
     steps:
     - name: Get build
       id: cache-plugin-build
-      uses: actions/cache@v3
+      uses: actions/download-artifact@v3
       with:
-        key: ${{ github.event.repository.name }}-${{ github.sha }}
-        path: |
-          josm/dist/${{ inputs.plugin-jar-name }}.jar
-          josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
-          josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
-    - name: Release
-      uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        files: |
-          josm/dist/${{ inputs.plugin-jar-name }}.jar
-          josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
-          josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
+        name: plugin-build
+    - name: Set revision env variable
+      id: create_revision
+      run: |
+        if [[ ! -z "${{ needs.create_tag.outputs.revision }}" ]]; then
+          revision="${{ needs.create_tag.outputs.revision }}"
+        else
+          revision="${{ github.ref_name }}"
+        fi
+        echo "revision=$revision" >> $GITHUB_OUTPUT
+        echo "revision_number=${revision#v}" >> $GITHUB_OUTPUT
 
-    - name: Notify users about GitHub release latest checkbox
-      if: ${{ inputs.update-pluginssource }}
-      run: echo "Use the latest toggle in the GitHub release page. URLs look like https://github.com/${{ github.repository }}/releases/latest/download/${{ inputs.plugin-jar-name }} ."
+    - name: Generate update site
+      id: create_update_site
+      run: |
+        jarname="${{ inputs.plugin-jar-name }}.jar"
+        jarurl="https://github.com/${{ github.repository }}/releases/download/${{ steps.create_revision.outputs.revision }}/${jarname}"
+        echo "${jarname};$jarurl" > updatesite
+        unzip -p "${jarname}" META-INF/MANIFEST.MF | sed 's/^/\t/' >> updatesite
+    - name: Release
+      run: |
+        ls -R .
+        target="${{ steps.create_revision.outputs.revision }}"
+        if [ -z "$(gh --repo ${{ github.repository }} release view \"${target}\")" ]; then
+          gh release --repo ${{ github.repository }} create "${target}" \
+            --title "${target}" \
+            --latest \
+            --generate-notes
+        fi
+        gh release --repo ${{ github.repository }} upload --clobber "${target}" \
+          "${{ inputs.plugin-jar-name }}.jar" \
+          "${{ inputs.plugin-jar-name }}-javadoc.jar" \
+          "${{ inputs.plugin-jar-name }}-sources.jar" \
+          "updatesite"
+      env:
+        GH_TOKEN: ${{ github.token }}
