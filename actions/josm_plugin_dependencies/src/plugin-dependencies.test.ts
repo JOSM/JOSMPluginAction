@@ -1,14 +1,6 @@
 import { pluginDependencies } from "./plugin-dependencies";
-import * as fs from "fs";
-import {
-  describe,
-  expect,
-  test,
-  jest,
-  afterEach,
-  beforeEach,
-} from "@jest/globals";
-import { join } from "path";
+import { describe, expect, test, jest, afterEach } from "@jest/globals";
+import mockFs from "mock-fs";
 
 const gradleProperties = `
     plugin.main.version = 18218
@@ -65,32 +57,27 @@ const buildXml = `
 describe("test plugin_dependencies/plugin_dependencies", () => {
   afterEach(() => {
     jest.restoreAllMocks().resetAllMocks().clearAllMocks();
-  });
-  beforeEach(() => {
-    jest.spyOn(fs, "readFileSync").mockImplementation((path) => {
-      if (path === join(".", "gradle.properties")) {
-        return gradleProperties;
-      } else if (path === join(".", "build.xml")) {
-        return buildXml;
-      }
-      throw Error("Unexpected path in test");
-    });
+    mockFs.restore();
   });
   test("gradle.properties", async () => {
-    jest
-      .spyOn(fs, "existsSync")
-      .mockImplementation((path) => path === join(".", "gradle.properties"));
-    await pluginDependencies(".").then((dependencies) => {
+    mockFs({
+      testData: {
+        "gradle.properties": gradleProperties,
+      },
+    });
+    await pluginDependencies("testData").then((dependencies) => {
       expect(dependencies).toContain("utilsplugin2");
       expect(dependencies).toContain("apache-http");
       expect(dependencies.length).toBe(2);
     });
   });
   test("build.xml", async () => {
-    jest
-      .spyOn(fs, "existsSync")
-      .mockImplementation((path) => path === join(".", "build.xml"));
-    await pluginDependencies(".").then((dependencies) => {
+    mockFs({
+      testData: {
+        "build.xml": buildXml,
+      },
+    });
+    await pluginDependencies("testData").then((dependencies) => {
       expect(dependencies).toContain("utilsplugin2");
       expect(dependencies).toContain("jts");
       expect(dependencies.length).toBe(2);

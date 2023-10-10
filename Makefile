@@ -1,7 +1,11 @@
 %_clean::
-	rm -rf actions/$*/node_modules
-	rm -rf actions/$*/dist
-	rm -rf actions/$*/package-lock.json
+	rm -rf actions/$*/node_modules || echo "actions/$*/node_modules already deleted"
+	rm -rf actions/$*/dist || echo "actions/$*/dist already deleted"
+	rm -r  actions/$*/package-lock.json || echo "actions/$*/package-lock.json already deleted"
+
+clean_root::
+	rm -rf node_modules || echo "node_modules already deleted"
+	rm package-lock.json || echo "package-lock.json already deleted"
 
 %_outdated::
 	cd actions/$* && \
@@ -9,26 +13,26 @@
 
 %_make::
 	cd actions/$* && \
-	if [ ! -d "node_modules" ]; then npm install; fi && \
 	npm run prepare
+
+make_root::
+	if [ ! -d "node_modules" ]; then npm install; fi && \
+	npm install --no-save prettier && \
+    npm install --no-save npm-check
 
 %_test::
 	cd actions/$* && \
-	if [ ! -d "node_modules" ]; then npm install; fi && \
-	npm install --no-save prettier npm-check && \
 	npm run all && \
 	npx prettier --check src && \
 	npx npm-check
 
 %_prettier::
 	cd actions/$* && \
-	if [ ! -d "node_modules" ]; then npm install; fi && \
-	npm install --no-save prettier && \
 	npx prettier --write src
 
-all: prettier josm_build_make josm_plugin_clone_make josm_plugin_dependencies_make setup-ant_make pmd_make checkstyle_make
+all: make_root prettier josm_build_make josm_plugin_clone_make josm_plugin_dependencies_make setup-ant_make pmd_make checkstyle_make
 
-clean: josm_build_clean josm_plugin_clone_clean josm_plugin_dependencies_clean setup-ant_clean pmd_clean checkstyle_clean
+clean: clean_root josm_build_clean josm_plugin_clone_clean josm_plugin_dependencies_clean setup-ant_clean pmd_clean checkstyle_clean
 
 prettier: josm_build_prettier josm_plugin_clone_prettier josm_plugin_dependencies_prettier setup-ant_prettier pmd_prettier checkstyle_prettier
 

@@ -2,12 +2,12 @@ name: "Ant setup"
 description: "Setup ant"
 inputs:
   ant-version:
-    default: 1.10.13
+    default: 1.10.14
     description: The version of ant to download and install
 outputs:
   ant-home:
     description: The location of the ant install
 
 runs:
-  using: "node16"
+  using: "node20"
   main: "dist/index.js"

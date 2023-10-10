@@ -30,7 +30,7 @@ on:
         required: false
       ant-version:
         type: string
-        default: 'apache-ant-1.10.13'
+        default: 'apache-ant-1.10.14'
       perform-revision-tagging:
         type: boolean
         default: false

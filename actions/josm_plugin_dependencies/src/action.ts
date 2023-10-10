@@ -16,7 +16,7 @@ async function josm(): Promise<string | undefined> {
   await group(`Restore JOSM dist (josm-r${josmRevision})`, async () => {
     return await restoreCache(
       [join("josm", "core", "dist", "josm-custom.jar")],
-      `josm-r${josmRevision}`
+      `josm-r${josmRevision}`,
     );
   });
   // Needed to test the plugin
@@ -26,9 +26,9 @@ async function josm(): Promise<string | undefined> {
     async () => {
       return await restoreCache(
         [join("josm", "core", "test", "build")],
-        `josm-tests-r${josmTestRevision}`
+        `josm-tests-r${josmTestRevision}`,
       );
-    }
+    },
   );
 }
 async function dependencies(pluginDir: string): Promise<void> {
@@ -38,8 +38,8 @@ async function dependencies(pluginDir: string): Promise<void> {
     await restoreCache(
       ["~/.ivy2/cache", "~/.ant/cache", "josm/core/tools"],
       `${process.platform}-${process.arch}-ivy-${await hashFiles(
-        "josm/core/**/ivy.xml"
-      )}`
+        "josm/core/**/ivy.xml",
+      )}`,
     );
     await group("Tool dependencies", async () => {
       const coreTools = join("josm", "plugins", "00_core_tools");
@@ -58,8 +58,8 @@ async function dependencies(pluginDir: string): Promise<void> {
       const ivyPluginCache = await restoreCache(
         ["~/.ivy2/cache", "~/.ant/cache"],
         `${process.platform}-${process.arch}-ivy-plugin-${await hashFiles(
-          "josm/plugins/**/ivy.xml"
-        )}`
+          "josm/plugins/**/ivy.xml",
+        )}`,
       );
       if (ivyPluginCache == null) {
         await exec("ant", [
@@ -70,8 +70,8 @@ async function dependencies(pluginDir: string): Promise<void> {
         await saveCache(
           ["~/.ivy2/cache/", "~/.ant/cache"],
           `${process.platform}-${process.arch}-ivy-plugin-${await hashFiles(
-            "josm/plugins/**/ivy.xml"
-          )}`
+            "josm/plugins/**/ivy.xml",
+          )}`,
         );
       }
     }
@@ -94,7 +94,7 @@ async function run(): Promise<void> {
       join(josmDist, pluginJarName + "-javadoc.jar"),
       join(josmDist, pluginJarName + "-sources.jar"),
     ],
-    `${context.repo.repo}-${context.sha}`
+    `${context.repo.repo}-${context.sha}`,
   );
   await dependencies(pluginDir);
 }

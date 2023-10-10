@@ -11,5 +11,5 @@ outputs:
   josm-test-revision:
     description: The actual JOSM test revision built. This is almost always the current SVN head.
 runs:
-  using: 'node16'
+  using: 'node20'
   main: 'dist/index.js'

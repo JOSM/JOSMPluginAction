@@ -23,17 +23,21 @@ async function cloneJosm(josmRevision: number): Promise<string> {
             .filter((str) => str.includes("core"))
             .map(
               async (repo) =>
-                await exec("svn", ["checkout"].concat(repo.split(" ")), options)
+                await exec(
+                  "svn",
+                  ["checkout"].concat(repo.split(" ")),
+                  options,
+                ),
             )
-            .values()
-        )
+            .values(),
+        ),
     );
   return "josm/core";
 }
 
 async function updateJosm(
   josmSource: string,
-  josmRevision: number
+  josmRevision: number,
 ): Promise<number> {
   return await exec("svn", [
     "update",
@@ -46,11 +50,11 @@ async function updateJosm(
 
 async function buildJosm(
   josmSource: string,
-  josmRevision: number
+  josmRevision: number,
 ): Promise<void> {
   const buildHit = await restoreCache(
     [josmSource + "/dist/josm-custom.jar"],
-    `josm-r${josmRevision}`
+    `josm-r${josmRevision}`,
   );
   // Short-circuit
   if (buildHit != null && buildHit !== "") {
@@ -60,29 +64,29 @@ async function buildJosm(
   const ivyFiles = await hashFiles("**/ivy.xml");
   const ivyHit = await restoreCache(
     ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
-    `${process.platform}-${process.arch}-ivy-${ivyFiles}`
+    `${process.platform}-${process.arch}-ivy-${ivyFiles}`,
   );
   if (ivyHit == null || ivyHit === "") {
     await exec("ant", ["-buildfile", josmSource + "/build.xml", "resolve"]);
     await saveCache(
       ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
-      `${process.platform}-${process.arch}-ivy-${ivyFiles}`
+      `${process.platform}-${process.arch}-ivy-${ivyFiles}`,
     );
   }
   await exec("ant", ["-buildfile", josmSource + "/build.xml", "dist"]);
   await saveCache(
     [josmSource + "/dist/josm-custom.jar"],
-    `josm-r${josmRevision}`
+    `josm-r${josmRevision}`,
   );
 }
 
 async function buildJosmTests(
   josmSource: string,
-  josmRevision: number
+  josmRevision: number,
 ): Promise<void> {
   const buildHit = await restoreCache(
     [josmSource + "/test/build"],
-    `josm-tests-r${josmRevision}`
+    `josm-tests-r${josmRevision}`,
   );
   // Short-circuit
   if (buildHit != null && buildHit !== "") {
@@ -93,13 +97,13 @@ async function buildJosmTests(
   const ivyFiles = await hashFiles(josmSource + "/**/ivy.xml");
   const ivyHit = await restoreCache(
     ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
-    `${process.platform}-${process.arch}-test-ivy-${ivyFiles}`
+    `${process.platform}-${process.arch}-test-ivy-${ivyFiles}`,
   );
   if (ivyHit == null || ivyHit === "") {
     await exec("ant", ["-buildfile", josmSource + "/build.xml", "test-init"]);
     await saveCache(
       ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
-      `${process.platform}-${process.arch}-test-ivy-${ivyFiles}`
+      `${process.platform}-${process.arch}-test-ivy-${ivyFiles}`,
     );
   }
   await exec("ant", ["-buildfile", josmSource + "/build.xml", "test-compile"]);
@@ -111,23 +115,23 @@ async function run(): Promise<void> {
   setOutput("josm-revision", josmRevision);
   const josmSource = await group(
     `JOSM clone r${josmRevision}`,
-    async () => await cloneJosm(josmRevision)
+    async () => await cloneJosm(josmRevision),
   );
   await group(`JOSM build r${josmRevision}`, async () => {
     await buildJosm(josmSource, josmRevision);
   });
   const josmTestRevision = await getJosmRevision(
-    getInput("josm-test-revision")
+    getInput("josm-test-revision"),
   );
   setOutput("josm-test-revision", josmTestRevision);
   const testBuildHit = await restoreCache(
     [josmSource + "/test/build"],
-    `josm-tests-r${josmTestRevision}`
+    `josm-tests-r${josmTestRevision}`,
   );
   if (testBuildHit == null) {
     await group(
       `JOSM update r${josmTestRevision}`,
-      async () => await updateJosm(josmSource, josmTestRevision)
+      async () => await updateJosm(josmSource, josmTestRevision),
     );
     await group(`JOSM build tests r${josmTestRevision}`, async () => {
       await buildJosmTests(josmSource, josmTestRevision);

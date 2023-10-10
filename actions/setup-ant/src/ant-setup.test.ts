@@ -34,12 +34,15 @@ describe("test downloadTool", () => {
     }
   });
 
-  test("1.10.12", async () => {
-    await downloadAntTool("1.10.12");
-    expect(coreAddPath).toBeCalledTimes(1);
-    expect(coreAddPath).toBeCalledWith(
-      join(tempDir, "cache", "apache-ant", "1.10.12", process.arch, "bin")
-    );
-    await rmRF("1.10.12");
+  test("1.10.14", async () => {
+    await downloadAntTool("1.10.14");
+    try {
+      expect(coreAddPath).toBeCalledTimes(1);
+      expect(coreAddPath).toBeCalledWith(
+          join(tempDir, "cache", "apache-ant", "1.10.14", process.arch, "bin"),
+      );
+    } finally {
+      await rmRF("1.10.14");
+    }
   }, 15_000);
 });

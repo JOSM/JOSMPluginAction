@@ -1,11 +1,24 @@
 import { debug, getInput, setFailed } from "@actions/core";
 import { readFileSync, existsSync } from "fs";
 import { XMLParser } from "fast-xml-parser";
-import { Problem } from "./problem";
-import { logProblems } from "./logProblems";
+import { Problem } from "pmd";
+import { logProblems } from "pmd";
 import { sep, join } from "path";
 
-function parseFile(trim: number, fileData: Object): Problem[] {
+interface Violations {
+  "@_source": string;
+  "@_message": string;
+  "@_severity": string;
+  "@_column": string;
+  "@_line": string;
+}
+
+interface FileData {
+  "@_name": string;
+  error?: Array<Violations>;
+}
+
+function parseFile(trim: number, fileData: FileData): Problem[] {
   let subFile = fileData["@_name"].split(sep);
   let currentlyTrimmed = 0;
   while (!existsSync(join(...subFile))) {

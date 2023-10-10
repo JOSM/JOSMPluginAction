@@ -1,6 +1,6 @@
 import { parseData } from "./action";
 import { describe, expect, test } from "@jest/globals";
-import { expectProblem } from "./problem.test";
+import { expectProblem } from "pmd/src/problem.test";
 
 const JOSM_SINGLE_EXAMPLE = `<?xml version="1.0" encoding="UTF-8"?>
 <checkstyle version="9.3">
@@ -25,9 +25,9 @@ describe("Test action/parseData", () => {
         endLine: 141,
         title:
           "com.puppycrawl.tools.checkstyle.checks.whitespace.WhitespaceAroundCheck",
-        info: "'}'; is not preceded with whitespace.",
+        info: "'}' is not preceded with whitespace.",
       },
-      problems[0]
+      problems[0],
     );
   });
 });

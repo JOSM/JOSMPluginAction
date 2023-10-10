@@ -1,7 +1,7 @@
 import { HttpClient } from "@actions/http-client";
 
 export async function getJosmRevision(
-  defaultRevision: string | null
+  defaultRevision: string | null,
 ): Promise<number> {
   let revision = defaultRevision;
   const client = new HttpClient("JOSMPluginAction/josm-build");

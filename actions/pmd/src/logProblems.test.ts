@@ -1,6 +1,6 @@
 import { describe, expect, jest, test } from "@jest/globals";
 import * as core from "@actions/core";
-import { logProblems } from "./action";
+import { logProblems } from "./logProblems";
 describe("Test action/logProblems", function () {
   test("Simple logging", () => {
     const log = jest.spyOn(core, "error");
@@ -17,7 +17,7 @@ describe("Test action/logProblems", function () {
     expect(log).toBeCalledTimes(1);
     expect(log).toBeCalledWith(
       "https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable",
-      problem
+      problem,
     );
   });
 });

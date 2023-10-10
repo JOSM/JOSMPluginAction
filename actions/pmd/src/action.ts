@@ -30,7 +30,7 @@ function parseFile(sourceDirectory: string, fileData: Object): Problem[] {
 
 export function parseData(
   sourceDirectory: string,
-  data: string | Buffer
+  data: string | Buffer,
 ): Problem[] {
   const alwaysArray = ["pmd.file", "pmd.file.violation"];
   const parser = new XMLParser({

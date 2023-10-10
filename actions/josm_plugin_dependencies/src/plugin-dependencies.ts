@@ -2,13 +2,14 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { exec, getExecOutput } from "@actions/exec";
 import { restoreCache, saveCache } from "@actions/cache";
-import fetch from "node-fetch";
+import { stringify } from "ts-jest";
+import * as https from "https";
 
 export async function pluginDependencies(directory: string): Promise<string[]> {
   if (existsSync(join(directory, "gradle.properties"))) {
     const data = readFileSync(
       join(directory, "gradle.properties"),
-      "utf8"
+      "utf8",
     ).split("\n");
     for (const line of data) {
       const match = line.match(/^ *plugin.requires/);
@@ -30,7 +31,7 @@ export async function pluginDependencies(directory: string): Promise<string[]> {
 
 export async function downloadPluginDependencies(
   svnDirectory: string,
-  dependencies: string[]
+  dependencies: string[],
 ): Promise<void> {
   const paths: string[] = [];
   const maxRevision: number = await getExecOutput("svn", ["info", svnDirectory])
@@ -47,7 +48,7 @@ export async function downloadPluginDependencies(
   for (const dependency of dependencies) {
     const path = join(
       svnDirectory,
-      dependency.endsWith(".jar") ? dependency : dependency + ".jar"
+      dependency.endsWith(".jar") ? dependency : dependency + ".jar",
     );
     paths.push(path);
   }
@@ -55,7 +56,7 @@ export async function downloadPluginDependencies(
     !Number.isNaN(maxRevision) &&
     (await restoreCache(
       paths,
-      `${process.platform}-${process.arch}-${paths.join(";")}-${maxRevision}`
+      `${process.platform}-${process.arch}-${paths.join(";")}-${maxRevision}`,
     )) != null
   ) {
     return;
@@ -64,7 +65,7 @@ export async function downloadPluginDependencies(
     await exec("svn", ["update", path]);
     if (!existsSync(path)) {
       await downloadPluginDependencyFromManifest(
-        path.replace(svnDirectory, "").substring(1 /* for / */)
+        path.replace(svnDirectory, "").substring(1 /* for / */),
       )
         .then((blob) => Buffer.from(blob))
         .then((blob) => {
@@ -75,23 +76,42 @@ export async function downloadPluginDependencies(
   if (!Number.isNaN(maxRevision)) {
     await saveCache(
       paths,
-      `${process.platform}-${process.arch}-${paths.join(";")}-${maxRevision}`
+      `${process.platform}-${process.arch}-${paths.join(";")}-${maxRevision}`,
     );
   }
 }
 
 async function downloadPluginDependencyFromManifest(
-  path: string
+  path: string,
 ): Promise<ArrayBuffer> {
-  return await fetch("https://josm.openstreetmap.de/plugin")
-    .then(async (result) => await result.text())
+  return await new Promise<string>((resolve, reject) => {
+    https
+      .get("https://josm.openstreetmap.de/plugin", (resp) => {
+        let data = "";
+        if (resp.statusCode !== 200) {
+          throw new Error(stringify(resp.statusCode));
+        }
+        resp.on("data", (d) => {
+          if (typeof d === "string") {
+            data += d;
+          } else {
+            data += stringify(d);
+          }
+        });
+
+        resp.on("end", () => {
+          resolve(data);
+        });
+      })
+      .on("error", (e) => reject(e));
+  })
     .then((text) =>
       text
         .split("\n")
         .filter(
           (line) =>
-            /^.*.jar;.*.jar$/.exec(line) != null && line.search(path) >= 0
-        )
+            /^.*.jar;.*.jar$/.exec(line) != null && line.search(path) >= 0,
+        ),
     )
     .then((lines) => lines[0])
     .then((line) => line.split(";")[1])

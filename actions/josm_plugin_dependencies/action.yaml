@@ -10,7 +10,6 @@ inputs:
   plugin-jar-name:
     description: "The name of the plugin jar. If not preset, defaults to repo name."
 
-# Don't forget to remove fetch dependency when we can move to node18 (or later)
 runs:
-  using: "node16"
+  using: "node20"
   main: "dist/index.js"

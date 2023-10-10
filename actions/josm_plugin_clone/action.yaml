@@ -5,5 +5,5 @@ outputs:
     description: The plugin directory (clone into this directory)
 
 runs:
-  using: "node16"
+  using: "node20"
   main: "dist/index.js"

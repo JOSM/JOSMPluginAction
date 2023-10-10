@@ -11,7 +11,7 @@ describe("test revisions", () => {
       .get("/svn/trunk/")
       .reply(
         200,
-        "<html><head><title>svn - Revision 19000: /trunk</title></head>\n<body></body></html>"
+        "<html><head><title>svn - Revision 19000: /trunk</title></head>\n<body></body></html>",
       );
     await getJosmRevision("").then((revision) => {
       expect(revision).toBe(19000);
@@ -22,7 +22,7 @@ describe("test revisions", () => {
       .get("/svn/trunk/")
       .reply(
         200,
-        "<html><head><title>svn - Revision 19000: /trunk</title></head>\n<body></body></html>"
+        "<html><head><title>svn - Revision 19000: /trunk</title></head>\n<body></body></html>",
       );
     await getJosmRevision(null).then((revision) => {
       expect(revision).toBe(19000);

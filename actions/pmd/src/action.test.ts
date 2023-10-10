@@ -59,7 +59,7 @@ describe("Test action/parseData", () => {
         title: "Best Practices/UnusedLocalVariable",
         info: "https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable",
       },
-      problems[0]
+      problems[0],
     );
   });
   test("JOSM Sample XML, two different files", () => {
@@ -75,7 +75,7 @@ describe("Test action/parseData", () => {
         title: "Best Practices/UnusedLocalVariable",
         info: "https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable",
       },
-      problems[0]
+      problems[0],
     );
     expectProblem(
       {
@@ -87,7 +87,7 @@ describe("Test action/parseData", () => {
         title: "Best Practices/UnusedLocalVariable",
         info: "https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable",
       },
-      problems[1]
+      problems[1],
     );
   });
   test("JOSM Example XML, two different problems in same file", () => {
@@ -103,7 +103,7 @@ describe("Test action/parseData", () => {
         title: "Best Practices/UnusedLocalVariable",
         info: "https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable",
       },
-      problems[0]
+      problems[0],
     );
     expectProblem(
       {
@@ -115,7 +115,7 @@ describe("Test action/parseData", () => {
         title: "Best Practices/UnusedLocalVariable",
         info: "https://pmd.github.io/pmd-6.53.0/pmd_rules_java_bestpractices.html#unusedlocalvariable",
       },
-      problems[1]
+      problems[1],
     );
   });
 });

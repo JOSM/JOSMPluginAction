@@ -4,7 +4,7 @@ import { join } from "path";
 
 async function cloneCoreSubRepos(
   directory: string,
-  depth: string | null
+  depth: string | null,
 ): Promise<number[]> {
   return await getExecOutput("svn", [
     "propget",
