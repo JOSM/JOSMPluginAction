@@ -15,7 +15,7 @@ on:
         required: false
       java-version:
         type: number
-        default: 8
+        default: 11
         description: The java version to build against
         required: false
       java-distribution:

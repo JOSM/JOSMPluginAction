@@ -10,7 +10,7 @@ inputs:
     description: JOSM revision to use to build tests against, '' is current svn head, 'latest' is current latest, 'tested' is current tested, and 'rNUMBER' is for specific revisions
     required: false
   java-version:
-    default: '8'
+    default: '11'
     description: The java version to build JOSM against. This should typically not be changed.
     required: false
   java-distribution:

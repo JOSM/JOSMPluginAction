@@ -56,9 +56,10 @@ Use a specific operating system for running the action.
 Defaults to `ubuntu-latest`.
 
 ### `java-version`
-Use a specific java version for running the action. Defaults to `8`.
-See [#17858](https://josm.openstreetmap.de/ticket/17858) for when this may change
-to something newer.
+Use a specific java version for running the action. Defaults to `11`.
+JOSM is dropping support for Java 8 starting in 2024 (see [#17858](https://josm.openstreetmap.de/ticket/17858#comment:149)),
+so this action is now running the compilation process using Java 11. Use the
+build property `java.lang.version` to set the target Java version, if necessary.
 
 ### `java-distribution`
 Use a specific java distribution for running the action. Defaults to `temurin`.
