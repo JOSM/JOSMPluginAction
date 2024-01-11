@@ -42,7 +42,7 @@ on:
 
 jobs:
   call-workflow:
-    uses: JOSM/JOSMPluginAction/workflows/ant.yml@v1
+    uses: JOSM/JOSMPluginAction/.github/workflows/ant.yml@v2
 ```
 
 ## Inputs (all optional)
