@@ -39,7 +39,7 @@ describe("test downloadTool", () => {
     try {
       expect(coreAddPath).toBeCalledTimes(1);
       expect(coreAddPath).toBeCalledWith(
-          join(tempDir, "cache", "apache-ant", "1.10.14", process.arch, "bin"),
+        join(tempDir, "cache", "apache-ant", "1.10.14", process.arch, "bin"),
       );
     } finally {
       await rmRF("1.10.14");
