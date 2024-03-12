@@ -2,7 +2,6 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { exec, getExecOutput } from "@actions/exec";
 import { restoreCache, saveCache } from "@actions/cache";
-import { stringify } from "ts-jest";
 import * as https from "https";
 
 export async function pluginDependencies(directory: string): Promise<string[]> {
@@ -89,13 +88,13 @@ async function downloadPluginDependencyFromManifest(
       .get("https://josm.openstreetmap.de/plugin", (resp) => {
         let data = "";
         if (resp.statusCode !== 200) {
-          throw new Error(stringify(resp.statusCode));
+          throw new Error(resp.statusCode?.toString());
         }
         resp.on("data", (d) => {
           if (typeof d === "string") {
             data += d;
           } else {
-            data += stringify(d);
+            data += d.toString();
           }
         });
 
