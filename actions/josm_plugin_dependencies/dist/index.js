@@ -707,7 +707,10 @@ function assertDefined(name, value) {
 exports.assertDefined = assertDefined;
 function isGhes() {
     const ghUrl = new URL(process.env['GITHUB_SERVER_URL'] || 'https://github.com');
-    return ghUrl.hostname.toUpperCase() !== 'GITHUB.COM';
+    const hostname = ghUrl.hostname.trimEnd().toUpperCase();
+    const isGitHubHost = hostname === 'GITHUB.COM';
+    const isGheHost = hostname.endsWith('.GHE.COM') || hostname.endsWith('.GHE.LOCALHOST');
+    return !isGitHubHost && !isGheHost;
 }
 exports.isGhes = isGhes;
 //# sourceMappingURL=cacheUtils.js.map
@@ -11124,7 +11127,7 @@ class HttpClient {
         if (this._keepAlive && useProxy) {
             agent = this._proxyAgent;
         }
-        if (this._keepAlive && !useProxy) {
+        if (!useProxy) {
             agent = this._agent;
         }
         // if agent is already assigned use that agent.
@@ -11156,15 +11159,11 @@ class HttpClient {
             agent = tunnelAgent(agentOptions);
             this._proxyAgent = agent;
         }
-        // if reusing agent across request and tunneling agent isn't assigned create a new agent
-        if (this._keepAlive && !agent) {
+        // if tunneling agent isn't assigned create a new agent
+        if (!agent) {
             const options = { keepAlive: this._keepAlive, maxSockets };
             agent = usingSsl ? new https.Agent(options) : new http.Agent(options);
             this._agent = agent;
-        }
-        // if not using private agent and tunnel agent isn't setup then use global agent
-        if (!agent) {
-            agent = usingSsl ? https.globalAgent : http.globalAgent;
         }
         if (usingSsl && this._ignoreSslError) {
             // we don't want to set NODE_TLS_REJECT_UNAUTHORIZED=0 since that will affect request for entire process
@@ -71237,40 +71236,34 @@ var TsJestTransformer = exports.TsJestTransformer = /** @class */ (function () {
         return result;
     };
     TsJestTransformer.prototype.processAsync = function (sourceText, sourcePath, transformOptions) {
+        var _a;
         return __awaiter(this, void 0, void 0, function () {
-            var _this = this;
-            return __generator(this, function (_a) {
-                this._logger.debug({ fileName: sourcePath, transformOptions: transformOptions }, 'processing', sourcePath);
-                return [2 /*return*/, new Promise(function (resolve, reject) { return __awaiter(_this, void 0, void 0, function () {
-                        var configs, shouldStringifyContent, babelJest, result, processWithTsResult;
-                        var _a;
-                        return __generator(this, function (_b) {
-                            switch (_b.label) {
-                                case 0:
-                                    configs = this._configsFor(transformOptions);
-                                    shouldStringifyContent = configs.shouldStringifyContent(sourcePath);
-                                    babelJest = shouldStringifyContent ? undefined : configs.babelJestTransformer;
-                                    processWithTsResult = this.processWithTs(sourceText, sourcePath, transformOptions);
-                                    result = {
-                                        code: processWithTsResult.code,
-                                    };
-                                    if ((_a = processWithTsResult.diagnostics) === null || _a === void 0 ? void 0 : _a.length) {
-                                        reject(configs.createTsError(processWithTsResult.diagnostics));
-                                    }
-                                    if (!babelJest) return [3 /*break*/, 2];
-                                    this._logger.debug({ fileName: sourcePath }, 'calling babel-jest processor');
-                                    return [4 /*yield*/, babelJest.processAsync(result.code, sourcePath, __assign(__assign({}, transformOptions), { instrument: false }))];
-                                case 1:
-                                    // do not instrument here, jest will do it anyway afterwards
-                                    result = _b.sent();
-                                    _b.label = 2;
-                                case 2:
-                                    result = this.runTsJestHook(sourcePath, sourceText, transformOptions, result);
-                                    resolve(result);
-                                    return [2 /*return*/];
-                            }
-                        });
-                    }); })];
+            var configs, shouldStringifyContent, babelJest, result, processWithTsResult;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        this._logger.debug({ fileName: sourcePath, transformOptions: transformOptions }, 'processing', sourcePath);
+                        configs = this._configsFor(transformOptions);
+                        shouldStringifyContent = configs.shouldStringifyContent(sourcePath);
+                        babelJest = shouldStringifyContent ? undefined : configs.babelJestTransformer;
+                        processWithTsResult = this.processWithTs(sourceText, sourcePath, transformOptions);
+                        result = {
+                            code: processWithTsResult.code,
+                        };
+                        if ((_a = processWithTsResult.diagnostics) === null || _a === void 0 ? void 0 : _a.length) {
+                            throw configs.createTsError(processWithTsResult.diagnostics);
+                        }
+                        if (!babelJest) return [3 /*break*/, 2];
+                        this._logger.debug({ fileName: sourcePath }, 'calling babel-jest processor');
+                        return [4 /*yield*/, babelJest.processAsync(result.code, sourcePath, __assign(__assign({}, transformOptions), { instrument: false }))];
+                    case 1:
+                        // do not instrument here, jest will do it anyway afterwards
+                        result = _b.sent();
+                        _b.label = 2;
+                    case 2:
+                        result = this.runTsJestHook(sourcePath, sourceText, transformOptions, result);
+                        return [2 /*return*/, result];
+                }
             });
         });
     };
@@ -71352,13 +71345,15 @@ var TsJestTransformer = exports.TsJestTransformer = /** @class */ (function () {
         var configs = this._configsFor(transformOptions);
         this._logger.debug({ fileName: filePath, transformOptions: transformOptions }, 'computing cache key for', filePath);
         // we do not instrument, ensure it is false all the time
-        var instrument = (_a = transformOptions.instrument, _a === void 0 ? false : _a);
+        var supportsStaticESM = transformOptions.supportsStaticESM, instrument = (_a = transformOptions.instrument, _a === void 0 ? false : _a);
         var constructingCacheKeyElements = [
             this._transformCfgStr,
             exports.CACHE_KEY_EL_SEPARATOR,
             configs.rootDir,
             exports.CACHE_KEY_EL_SEPARATOR,
             "instrument:".concat(instrument ? 'on' : 'off'),
+            exports.CACHE_KEY_EL_SEPARATOR,
+            "supportsStaticESM:".concat(supportsStaticESM ? 'on' : 'off'),
             exports.CACHE_KEY_EL_SEPARATOR,
             fileContent,
             exports.CACHE_KEY_EL_SEPARATOR,
@@ -104754,7 +104749,7 @@ module.exports = JSON.parse('[[[0,44],"disallowed_STD3_valid"],[[45,46],"valid"]
 /***/ ((module) => {
 
 "use strict";
-module.exports = {"i8":"29.1.1"};
+module.exports = {"i8":"29.1.2"};
 
 /***/ })
 
