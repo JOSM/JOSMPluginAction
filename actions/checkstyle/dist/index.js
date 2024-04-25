@@ -29079,9 +29079,13 @@ function checkstyle_run(pathTrim, checkstyleFile) {
 
 
 async function action_run() {
+    (0,core.debug)("start");
     const checkstyleFile = (0,core.getInput)("file");
+    (0,core.debug)("checkstyleFile: " + checkstyleFile);
     const pathTrim = (0,core.getInput)("pathTrim");
+    (0,core.debug)("pathTrim: " + pathTrim);
     checkstyle_run(checkstyleFile, pathTrim);
+    (0,core.debug)("end");
 }
 action_run().catch((err) => {
     console.log(err.stack);
