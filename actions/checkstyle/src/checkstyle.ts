@@ -76,6 +76,8 @@ export function run(pathTrim: string, checkstyleFile: string) {
   } else {
     trim = parseInt(pathTrim);
   }
+  debug("trim: " + trim);
+  debug("checkstyleFile: " + checkstyleFile);
   const data = readFileSync(checkstyleFile);
   debug(data.toString());
   logProblems(parseData(trim, data));

@@ -29068,6 +29068,8 @@ function checkstyle_run(pathTrim, checkstyleFile) {
     else {
         trim = parseInt(pathTrim);
     }
+    (0,core.debug)("trim: " + trim);
+    (0,core.debug)("checkstyleFile: " + checkstyleFile);
     const data = (0,external_fs_.readFileSync)(checkstyleFile);
     (0,core.debug)(data.toString());
     logProblems(checkstyle_parseData(trim, data));
