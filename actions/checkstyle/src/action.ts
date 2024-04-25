@@ -83,4 +83,7 @@ async function run(): Promise<void> {
   logProblems(parseData(trim, data));
 }
 
-run().catch((err) => setFailed(err));
+run().catch((err) => {
+  console.log(err);
+  setFailed(err);
+});

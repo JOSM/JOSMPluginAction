@@ -6,7 +6,21 @@ import { Problem } from "./problem";
 
 export { Problem, logProblems };
 
-function parseFile(sourceDirectory: string, fileData: Object): Problem[] {
+type Violation = {
+  "@_ruleset": string;
+  "@_rule": string;
+  "@_begincolumn": string;
+  "@_endcolumn": string;
+  "@_beginline": string;
+  "@_endline": string;
+  "@_externalInfoUrl": string;
+};
+type FileData = {
+  violation: Violation[];
+  "@_name": string;
+};
+
+function parseFile(sourceDirectory: string, fileData: FileData): Problem[] {
   const file =
     (sourceDirectory.length > 0 && !sourceDirectory.endsWith("/")
       ? sourceDirectory + "/"

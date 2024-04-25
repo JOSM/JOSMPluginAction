@@ -564,7 +564,7 @@ const glob = __importStar(__nccwpck_require__(5256));
 const io = __importStar(__nccwpck_require__(47));
 const fs = __importStar(__nccwpck_require__(7147));
 const path = __importStar(__nccwpck_require__(1017));
-const semver = __importStar(__nccwpck_require__(3113));
+const semver = __importStar(__nccwpck_require__(4800));
 const util = __importStar(__nccwpck_require__(3837));
 const uuid_1 = __nccwpck_require__(4806);
 const constants_1 = __nccwpck_require__(648);
@@ -2491,7 +2491,7 @@ const os = __importStar(__nccwpck_require__(2037));
 const path = __importStar(__nccwpck_require__(1017));
 const pathHelper = __importStar(__nccwpck_require__(8886));
 const assert_1 = __importDefault(__nccwpck_require__(9491));
-const minimatch_1 = __nccwpck_require__(9069);
+const minimatch_1 = __nccwpck_require__(9566);
 const internal_match_kind_1 = __nccwpck_require__(6839);
 const internal_path_1 = __nccwpck_require__(3851);
 const IS_WINDOWS = process.platform === 'win32';
@@ -2735,2818 +2735,6 @@ class SearchState {
 }
 exports.SearchState = SearchState;
 //# sourceMappingURL=internal-search-state.js.map
-
-/***/ }),
-
-/***/ 2385:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-var concatMap = __nccwpck_require__(4527);
-var balanced = __nccwpck_require__(3353);
-
-module.exports = expandTop;
-
-var escSlash = '\0SLASH'+Math.random()+'\0';
-var escOpen = '\0OPEN'+Math.random()+'\0';
-var escClose = '\0CLOSE'+Math.random()+'\0';
-var escComma = '\0COMMA'+Math.random()+'\0';
-var escPeriod = '\0PERIOD'+Math.random()+'\0';
-
-function numeric(str) {
-  return parseInt(str, 10) == str
-    ? parseInt(str, 10)
-    : str.charCodeAt(0);
-}
-
-function escapeBraces(str) {
-  return str.split('\\\\').join(escSlash)
-            .split('\\{').join(escOpen)
-            .split('\\}').join(escClose)
-            .split('\\,').join(escComma)
-            .split('\\.').join(escPeriod);
-}
-
-function unescapeBraces(str) {
-  return str.split(escSlash).join('\\')
-            .split(escOpen).join('{')
-            .split(escClose).join('}')
-            .split(escComma).join(',')
-            .split(escPeriod).join('.');
-}
-
-
-// Basically just str.split(","), but handling cases
-// where we have nested braced sections, which should be
-// treated as individual members, like {a,{b,c},d}
-function parseCommaParts(str) {
-  if (!str)
-    return [''];
-
-  var parts = [];
-  var m = balanced('{', '}', str);
-
-  if (!m)
-    return str.split(',');
-
-  var pre = m.pre;
-  var body = m.body;
-  var post = m.post;
-  var p = pre.split(',');
-
-  p[p.length-1] += '{' + body + '}';
-  var postParts = parseCommaParts(post);
-  if (post.length) {
-    p[p.length-1] += postParts.shift();
-    p.push.apply(p, postParts);
-  }
-
-  parts.push.apply(parts, p);
-
-  return parts;
-}
-
-function expandTop(str) {
-  if (!str)
-    return [];
-
-  // I don't know why Bash 4.3 does this, but it does.
-  // Anything starting with {} will have the first two bytes preserved
-  // but *only* at the top level, so {},a}b will not expand to anything,
-  // but a{},b}c will be expanded to [a}c,abc].
-  // One could argue that this is a bug in Bash, but since the goal of
-  // this module is to match Bash's rules, we escape a leading {}
-  if (str.substr(0, 2) === '{}') {
-    str = '\\{\\}' + str.substr(2);
-  }
-
-  return expand(escapeBraces(str), true).map(unescapeBraces);
-}
-
-function identity(e) {
-  return e;
-}
-
-function embrace(str) {
-  return '{' + str + '}';
-}
-function isPadded(el) {
-  return /^-?0\d/.test(el);
-}
-
-function lte(i, y) {
-  return i <= y;
-}
-function gte(i, y) {
-  return i >= y;
-}
-
-function expand(str, isTop) {
-  var expansions = [];
-
-  var m = balanced('{', '}', str);
-  if (!m || /\$$/.test(m.pre)) return [str];
-
-  var isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body);
-  var isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body);
-  var isSequence = isNumericSequence || isAlphaSequence;
-  var isOptions = m.body.indexOf(',') >= 0;
-  if (!isSequence && !isOptions) {
-    // {a},b}
-    if (m.post.match(/,.*\}/)) {
-      str = m.pre + '{' + m.body + escClose + m.post;
-      return expand(str);
-    }
-    return [str];
-  }
-
-  var n;
-  if (isSequence) {
-    n = m.body.split(/\.\./);
-  } else {
-    n = parseCommaParts(m.body);
-    if (n.length === 1) {
-      // x{{a,b}}y ==> x{a}y x{b}y
-      n = expand(n[0], false).map(embrace);
-      if (n.length === 1) {
-        var post = m.post.length
-          ? expand(m.post, false)
-          : [''];
-        return post.map(function(p) {
-          return m.pre + n[0] + p;
-        });
-      }
-    }
-  }
-
-  // at this point, n is the parts, and we know it's not a comma set
-  // with a single entry.
-
-  // no need to expand pre, since it is guaranteed to be free of brace-sets
-  var pre = m.pre;
-  var post = m.post.length
-    ? expand(m.post, false)
-    : [''];
-
-  var N;
-
-  if (isSequence) {
-    var x = numeric(n[0]);
-    var y = numeric(n[1]);
-    var width = Math.max(n[0].length, n[1].length)
-    var incr = n.length == 3
-      ? Math.abs(numeric(n[2]))
-      : 1;
-    var test = lte;
-    var reverse = y < x;
-    if (reverse) {
-      incr *= -1;
-      test = gte;
-    }
-    var pad = n.some(isPadded);
-
-    N = [];
-
-    for (var i = x; test(i, y); i += incr) {
-      var c;
-      if (isAlphaSequence) {
-        c = String.fromCharCode(i);
-        if (c === '\\')
-          c = '';
-      } else {
-        c = String(i);
-        if (pad) {
-          var need = width - c.length;
-          if (need > 0) {
-            var z = new Array(need + 1).join('0');
-            if (i < 0)
-              c = '-' + z + c.slice(1);
-            else
-              c = z + c;
-          }
-        }
-      }
-      N.push(c);
-    }
-  } else {
-    N = concatMap(n, function(el) { return expand(el, false) });
-  }
-
-  for (var j = 0; j < N.length; j++) {
-    for (var k = 0; k < post.length; k++) {
-      var expansion = pre + N[j] + post[k];
-      if (!isTop || isSequence || expansion)
-        expansions.push(expansion);
-    }
-  }
-
-  return expansions;
-}
-
-
-
-/***/ }),
-
-/***/ 9069:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-module.exports = minimatch
-minimatch.Minimatch = Minimatch
-
-var path = (function () { try { return __nccwpck_require__(1017) } catch (e) {}}()) || {
-  sep: '/'
-}
-minimatch.sep = path.sep
-
-var GLOBSTAR = minimatch.GLOBSTAR = Minimatch.GLOBSTAR = {}
-var expand = __nccwpck_require__(2385)
-
-var plTypes = {
-  '!': { open: '(?:(?!(?:', close: '))[^/]*?)'},
-  '?': { open: '(?:', close: ')?' },
-  '+': { open: '(?:', close: ')+' },
-  '*': { open: '(?:', close: ')*' },
-  '@': { open: '(?:', close: ')' }
-}
-
-// any single thing other than /
-// don't need to escape / when using new RegExp()
-var qmark = '[^/]'
-
-// * => any number of characters
-var star = qmark + '*?'
-
-// ** when dots are allowed.  Anything goes, except .. and .
-// not (^ or / followed by one or two dots followed by $ or /),
-// followed by anything, any number of times.
-var twoStarDot = '(?:(?!(?:\\\/|^)(?:\\.{1,2})($|\\\/)).)*?'
-
-// not a ^ or / followed by a dot,
-// followed by anything, any number of times.
-var twoStarNoDot = '(?:(?!(?:\\\/|^)\\.).)*?'
-
-// characters that need to be escaped in RegExp.
-var reSpecials = charSet('().*{}+?[]^$\\!')
-
-// "abc" -> { a:true, b:true, c:true }
-function charSet (s) {
-  return s.split('').reduce(function (set, c) {
-    set[c] = true
-    return set
-  }, {})
-}
-
-// normalizes slashes.
-var slashSplit = /\/+/
-
-minimatch.filter = filter
-function filter (pattern, options) {
-  options = options || {}
-  return function (p, i, list) {
-    return minimatch(p, pattern, options)
-  }
-}
-
-function ext (a, b) {
-  b = b || {}
-  var t = {}
-  Object.keys(a).forEach(function (k) {
-    t[k] = a[k]
-  })
-  Object.keys(b).forEach(function (k) {
-    t[k] = b[k]
-  })
-  return t
-}
-
-minimatch.defaults = function (def) {
-  if (!def || typeof def !== 'object' || !Object.keys(def).length) {
-    return minimatch
-  }
-
-  var orig = minimatch
-
-  var m = function minimatch (p, pattern, options) {
-    return orig(p, pattern, ext(def, options))
-  }
-
-  m.Minimatch = function Minimatch (pattern, options) {
-    return new orig.Minimatch(pattern, ext(def, options))
-  }
-  m.Minimatch.defaults = function defaults (options) {
-    return orig.defaults(ext(def, options)).Minimatch
-  }
-
-  m.filter = function filter (pattern, options) {
-    return orig.filter(pattern, ext(def, options))
-  }
-
-  m.defaults = function defaults (options) {
-    return orig.defaults(ext(def, options))
-  }
-
-  m.makeRe = function makeRe (pattern, options) {
-    return orig.makeRe(pattern, ext(def, options))
-  }
-
-  m.braceExpand = function braceExpand (pattern, options) {
-    return orig.braceExpand(pattern, ext(def, options))
-  }
-
-  m.match = function (list, pattern, options) {
-    return orig.match(list, pattern, ext(def, options))
-  }
-
-  return m
-}
-
-Minimatch.defaults = function (def) {
-  return minimatch.defaults(def).Minimatch
-}
-
-function minimatch (p, pattern, options) {
-  assertValidPattern(pattern)
-
-  if (!options) options = {}
-
-  // shortcut: comments match nothing.
-  if (!options.nocomment && pattern.charAt(0) === '#') {
-    return false
-  }
-
-  return new Minimatch(pattern, options).match(p)
-}
-
-function Minimatch (pattern, options) {
-  if (!(this instanceof Minimatch)) {
-    return new Minimatch(pattern, options)
-  }
-
-  assertValidPattern(pattern)
-
-  if (!options) options = {}
-
-  pattern = pattern.trim()
-
-  // windows support: need to use /, not \
-  if (!options.allowWindowsEscape && path.sep !== '/') {
-    pattern = pattern.split(path.sep).join('/')
-  }
-
-  this.options = options
-  this.set = []
-  this.pattern = pattern
-  this.regexp = null
-  this.negate = false
-  this.comment = false
-  this.empty = false
-  this.partial = !!options.partial
-
-  // make the set of regexps etc.
-  this.make()
-}
-
-Minimatch.prototype.debug = function () {}
-
-Minimatch.prototype.make = make
-function make () {
-  var pattern = this.pattern
-  var options = this.options
-
-  // empty patterns and comments match nothing.
-  if (!options.nocomment && pattern.charAt(0) === '#') {
-    this.comment = true
-    return
-  }
-  if (!pattern) {
-    this.empty = true
-    return
-  }
-
-  // step 1: figure out negation, etc.
-  this.parseNegate()
-
-  // step 2: expand braces
-  var set = this.globSet = this.braceExpand()
-
-  if (options.debug) this.debug = function debug() { console.error.apply(console, arguments) }
-
-  this.debug(this.pattern, set)
-
-  // step 3: now we have a set, so turn each one into a series of path-portion
-  // matching patterns.
-  // These will be regexps, except in the case of "**", which is
-  // set to the GLOBSTAR object for globstar behavior,
-  // and will not contain any / characters
-  set = this.globParts = set.map(function (s) {
-    return s.split(slashSplit)
-  })
-
-  this.debug(this.pattern, set)
-
-  // glob --> regexps
-  set = set.map(function (s, si, set) {
-    return s.map(this.parse, this)
-  }, this)
-
-  this.debug(this.pattern, set)
-
-  // filter out everything that didn't compile properly.
-  set = set.filter(function (s) {
-    return s.indexOf(false) === -1
-  })
-
-  this.debug(this.pattern, set)
-
-  this.set = set
-}
-
-Minimatch.prototype.parseNegate = parseNegate
-function parseNegate () {
-  var pattern = this.pattern
-  var negate = false
-  var options = this.options
-  var negateOffset = 0
-
-  if (options.nonegate) return
-
-  for (var i = 0, l = pattern.length
-    ; i < l && pattern.charAt(i) === '!'
-    ; i++) {
-    negate = !negate
-    negateOffset++
-  }
-
-  if (negateOffset) this.pattern = pattern.substr(negateOffset)
-  this.negate = negate
-}
-
-// Brace expansion:
-// a{b,c}d -> abd acd
-// a{b,}c -> abc ac
-// a{0..3}d -> a0d a1d a2d a3d
-// a{b,c{d,e}f}g -> abg acdfg acefg
-// a{b,c}d{e,f}g -> abdeg acdeg abdeg abdfg
-//
-// Invalid sets are not expanded.
-// a{2..}b -> a{2..}b
-// a{b}c -> a{b}c
-minimatch.braceExpand = function (pattern, options) {
-  return braceExpand(pattern, options)
-}
-
-Minimatch.prototype.braceExpand = braceExpand
-
-function braceExpand (pattern, options) {
-  if (!options) {
-    if (this instanceof Minimatch) {
-      options = this.options
-    } else {
-      options = {}
-    }
-  }
-
-  pattern = typeof pattern === 'undefined'
-    ? this.pattern : pattern
-
-  assertValidPattern(pattern)
-
-  // Thanks to Yeting Li <https://github.com/yetingli> for
-  // improving this regexp to avoid a ReDOS vulnerability.
-  if (options.nobrace || !/\{(?:(?!\{).)*\}/.test(pattern)) {
-    // shortcut. no need to expand.
-    return [pattern]
-  }
-
-  return expand(pattern)
-}
-
-var MAX_PATTERN_LENGTH = 1024 * 64
-var assertValidPattern = function (pattern) {
-  if (typeof pattern !== 'string') {
-    throw new TypeError('invalid pattern')
-  }
-
-  if (pattern.length > MAX_PATTERN_LENGTH) {
-    throw new TypeError('pattern is too long')
-  }
-}
-
-// parse a component of the expanded set.
-// At this point, no pattern may contain "/" in it
-// so we're going to return a 2d array, where each entry is the full
-// pattern, split on '/', and then turned into a regular expression.
-// A regexp is made at the end which joins each array with an
-// escaped /, and another full one which joins each regexp with |.
-//
-// Following the lead of Bash 4.1, note that "**" only has special meaning
-// when it is the *only* thing in a path portion.  Otherwise, any series
-// of * is equivalent to a single *.  Globstar behavior is enabled by
-// default, and can be disabled by setting options.noglobstar.
-Minimatch.prototype.parse = parse
-var SUBPARSE = {}
-function parse (pattern, isSub) {
-  assertValidPattern(pattern)
-
-  var options = this.options
-
-  // shortcuts
-  if (pattern === '**') {
-    if (!options.noglobstar)
-      return GLOBSTAR
-    else
-      pattern = '*'
-  }
-  if (pattern === '') return ''
-
-  var re = ''
-  var hasMagic = !!options.nocase
-  var escaping = false
-  // ? => one single character
-  var patternListStack = []
-  var negativeLists = []
-  var stateChar
-  var inClass = false
-  var reClassStart = -1
-  var classStart = -1
-  // . and .. never match anything that doesn't start with .,
-  // even when options.dot is set.
-  var patternStart = pattern.charAt(0) === '.' ? '' // anything
-  // not (start or / followed by . or .. followed by / or end)
-  : options.dot ? '(?!(?:^|\\\/)\\.{1,2}(?:$|\\\/))'
-  : '(?!\\.)'
-  var self = this
-
-  function clearStateChar () {
-    if (stateChar) {
-      // we had some state-tracking character
-      // that wasn't consumed by this pass.
-      switch (stateChar) {
-        case '*':
-          re += star
-          hasMagic = true
-        break
-        case '?':
-          re += qmark
-          hasMagic = true
-        break
-        default:
-          re += '\\' + stateChar
-        break
-      }
-      self.debug('clearStateChar %j %j', stateChar, re)
-      stateChar = false
-    }
-  }
-
-  for (var i = 0, len = pattern.length, c
-    ; (i < len) && (c = pattern.charAt(i))
-    ; i++) {
-    this.debug('%s\t%s %s %j', pattern, i, re, c)
-
-    // skip over any that are escaped.
-    if (escaping && reSpecials[c]) {
-      re += '\\' + c
-      escaping = false
-      continue
-    }
-
-    switch (c) {
-      /* istanbul ignore next */
-      case '/': {
-        // completely not allowed, even escaped.
-        // Should already be path-split by now.
-        return false
-      }
-
-      case '\\':
-        clearStateChar()
-        escaping = true
-      continue
-
-      // the various stateChar values
-      // for the "extglob" stuff.
-      case '?':
-      case '*':
-      case '+':
-      case '@':
-      case '!':
-        this.debug('%s\t%s %s %j <-- stateChar', pattern, i, re, c)
-
-        // all of those are literals inside a class, except that
-        // the glob [!a] means [^a] in regexp
-        if (inClass) {
-          this.debug('  in class')
-          if (c === '!' && i === classStart + 1) c = '^'
-          re += c
-          continue
-        }
-
-        // if we already have a stateChar, then it means
-        // that there was something like ** or +? in there.
-        // Handle the stateChar, then proceed with this one.
-        self.debug('call clearStateChar %j', stateChar)
-        clearStateChar()
-        stateChar = c
-        // if extglob is disabled, then +(asdf|foo) isn't a thing.
-        // just clear the statechar *now*, rather than even diving into
-        // the patternList stuff.
-        if (options.noext) clearStateChar()
-      continue
-
-      case '(':
-        if (inClass) {
-          re += '('
-          continue
-        }
-
-        if (!stateChar) {
-          re += '\\('
-          continue
-        }
-
-        patternListStack.push({
-          type: stateChar,
-          start: i - 1,
-          reStart: re.length,
-          open: plTypes[stateChar].open,
-          close: plTypes[stateChar].close
-        })
-        // negation is (?:(?!js)[^/]*)
-        re += stateChar === '!' ? '(?:(?!(?:' : '(?:'
-        this.debug('plType %j %j', stateChar, re)
-        stateChar = false
-      continue
-
-      case ')':
-        if (inClass || !patternListStack.length) {
-          re += '\\)'
-          continue
-        }
-
-        clearStateChar()
-        hasMagic = true
-        var pl = patternListStack.pop()
-        // negation is (?:(?!js)[^/]*)
-        // The others are (?:<pattern>)<type>
-        re += pl.close
-        if (pl.type === '!') {
-          negativeLists.push(pl)
-        }
-        pl.reEnd = re.length
-      continue
-
-      case '|':
-        if (inClass || !patternListStack.length || escaping) {
-          re += '\\|'
-          escaping = false
-          continue
-        }
-
-        clearStateChar()
-        re += '|'
-      continue
-
-      // these are mostly the same in regexp and glob
-      case '[':
-        // swallow any state-tracking char before the [
-        clearStateChar()
-
-        if (inClass) {
-          re += '\\' + c
-          continue
-        }
-
-        inClass = true
-        classStart = i
-        reClassStart = re.length
-        re += c
-      continue
-
-      case ']':
-        //  a right bracket shall lose its special
-        //  meaning and represent itself in
-        //  a bracket expression if it occurs
-        //  first in the list.  -- POSIX.2 2.8.3.2
-        if (i === classStart + 1 || !inClass) {
-          re += '\\' + c
-          escaping = false
-          continue
-        }
-
-        // handle the case where we left a class open.
-        // "[z-a]" is valid, equivalent to "\[z-a\]"
-        // split where the last [ was, make sure we don't have
-        // an invalid re. if so, re-walk the contents of the
-        // would-be class to re-translate any characters that
-        // were passed through as-is
-        // TODO: It would probably be faster to determine this
-        // without a try/catch and a new RegExp, but it's tricky
-        // to do safely.  For now, this is safe and works.
-        var cs = pattern.substring(classStart + 1, i)
-        try {
-          RegExp('[' + cs + ']')
-        } catch (er) {
-          // not a valid class!
-          var sp = this.parse(cs, SUBPARSE)
-          re = re.substr(0, reClassStart) + '\\[' + sp[0] + '\\]'
-          hasMagic = hasMagic || sp[1]
-          inClass = false
-          continue
-        }
-
-        // finish up the class.
-        hasMagic = true
-        inClass = false
-        re += c
-      continue
-
-      default:
-        // swallow any state char that wasn't consumed
-        clearStateChar()
-
-        if (escaping) {
-          // no need
-          escaping = false
-        } else if (reSpecials[c]
-          && !(c === '^' && inClass)) {
-          re += '\\'
-        }
-
-        re += c
-
-    } // switch
-  } // for
-
-  // handle the case where we left a class open.
-  // "[abc" is valid, equivalent to "\[abc"
-  if (inClass) {
-    // split where the last [ was, and escape it
-    // this is a huge pita.  We now have to re-walk
-    // the contents of the would-be class to re-translate
-    // any characters that were passed through as-is
-    cs = pattern.substr(classStart + 1)
-    sp = this.parse(cs, SUBPARSE)
-    re = re.substr(0, reClassStart) + '\\[' + sp[0]
-    hasMagic = hasMagic || sp[1]
-  }
-
-  // handle the case where we had a +( thing at the *end*
-  // of the pattern.
-  // each pattern list stack adds 3 chars, and we need to go through
-  // and escape any | chars that were passed through as-is for the regexp.
-  // Go through and escape them, taking care not to double-escape any
-  // | chars that were already escaped.
-  for (pl = patternListStack.pop(); pl; pl = patternListStack.pop()) {
-    var tail = re.slice(pl.reStart + pl.open.length)
-    this.debug('setting tail', re, pl)
-    // maybe some even number of \, then maybe 1 \, followed by a |
-    tail = tail.replace(/((?:\\{2}){0,64})(\\?)\|/g, function (_, $1, $2) {
-      if (!$2) {
-        // the | isn't already escaped, so escape it.
-        $2 = '\\'
-      }
-
-      // need to escape all those slashes *again*, without escaping the
-      // one that we need for escaping the | character.  As it works out,
-      // escaping an even number of slashes can be done by simply repeating
-      // it exactly after itself.  That's why this trick works.
-      //
-      // I am sorry that you have to see this.
-      return $1 + $1 + $2 + '|'
-    })
-
-    this.debug('tail=%j\n   %s', tail, tail, pl, re)
-    var t = pl.type === '*' ? star
-      : pl.type === '?' ? qmark
-      : '\\' + pl.type
-
-    hasMagic = true
-    re = re.slice(0, pl.reStart) + t + '\\(' + tail
-  }
-
-  // handle trailing things that only matter at the very end.
-  clearStateChar()
-  if (escaping) {
-    // trailing \\
-    re += '\\\\'
-  }
-
-  // only need to apply the nodot start if the re starts with
-  // something that could conceivably capture a dot
-  var addPatternStart = false
-  switch (re.charAt(0)) {
-    case '[': case '.': case '(': addPatternStart = true
-  }
-
-  // Hack to work around lack of negative lookbehind in JS
-  // A pattern like: *.!(x).!(y|z) needs to ensure that a name
-  // like 'a.xyz.yz' doesn't match.  So, the first negative
-  // lookahead, has to look ALL the way ahead, to the end of
-  // the pattern.
-  for (var n = negativeLists.length - 1; n > -1; n--) {
-    var nl = negativeLists[n]
-
-    var nlBefore = re.slice(0, nl.reStart)
-    var nlFirst = re.slice(nl.reStart, nl.reEnd - 8)
-    var nlLast = re.slice(nl.reEnd - 8, nl.reEnd)
-    var nlAfter = re.slice(nl.reEnd)
-
-    nlLast += nlAfter
-
-    // Handle nested stuff like *(*.js|!(*.json)), where open parens
-    // mean that we should *not* include the ) in the bit that is considered
-    // "after" the negated section.
-    var openParensBefore = nlBefore.split('(').length - 1
-    var cleanAfter = nlAfter
-    for (i = 0; i < openParensBefore; i++) {
-      cleanAfter = cleanAfter.replace(/\)[+*?]?/, '')
-    }
-    nlAfter = cleanAfter
-
-    var dollar = ''
-    if (nlAfter === '' && isSub !== SUBPARSE) {
-      dollar = '$'
-    }
-    var newRe = nlBefore + nlFirst + nlAfter + dollar + nlLast
-    re = newRe
-  }
-
-  // if the re is not "" at this point, then we need to make sure
-  // it doesn't match against an empty path part.
-  // Otherwise a/* will match a/, which it should not.
-  if (re !== '' && hasMagic) {
-    re = '(?=.)' + re
-  }
-
-  if (addPatternStart) {
-    re = patternStart + re
-  }
-
-  // parsing just a piece of a larger pattern.
-  if (isSub === SUBPARSE) {
-    return [re, hasMagic]
-  }
-
-  // skip the regexp for non-magical patterns
-  // unescape anything in it, though, so that it'll be
-  // an exact match against a file etc.
-  if (!hasMagic) {
-    return globUnescape(pattern)
-  }
-
-  var flags = options.nocase ? 'i' : ''
-  try {
-    var regExp = new RegExp('^' + re + '$', flags)
-  } catch (er) /* istanbul ignore next - should be impossible */ {
-    // If it was an invalid regular expression, then it can't match
-    // anything.  This trick looks for a character after the end of
-    // the string, which is of course impossible, except in multi-line
-    // mode, but it's not a /m regex.
-    return new RegExp('$.')
-  }
-
-  regExp._glob = pattern
-  regExp._src = re
-
-  return regExp
-}
-
-minimatch.makeRe = function (pattern, options) {
-  return new Minimatch(pattern, options || {}).makeRe()
-}
-
-Minimatch.prototype.makeRe = makeRe
-function makeRe () {
-  if (this.regexp || this.regexp === false) return this.regexp
-
-  // at this point, this.set is a 2d array of partial
-  // pattern strings, or "**".
-  //
-  // It's better to use .match().  This function shouldn't
-  // be used, really, but it's pretty convenient sometimes,
-  // when you just want to work with a regex.
-  var set = this.set
-
-  if (!set.length) {
-    this.regexp = false
-    return this.regexp
-  }
-  var options = this.options
-
-  var twoStar = options.noglobstar ? star
-    : options.dot ? twoStarDot
-    : twoStarNoDot
-  var flags = options.nocase ? 'i' : ''
-
-  var re = set.map(function (pattern) {
-    return pattern.map(function (p) {
-      return (p === GLOBSTAR) ? twoStar
-      : (typeof p === 'string') ? regExpEscape(p)
-      : p._src
-    }).join('\\\/')
-  }).join('|')
-
-  // must match entire pattern
-  // ending in a * or ** will make it less strict.
-  re = '^(?:' + re + ')$'
-
-  // can match anything, as long as it's not this.
-  if (this.negate) re = '^(?!' + re + ').*$'
-
-  try {
-    this.regexp = new RegExp(re, flags)
-  } catch (ex) /* istanbul ignore next - should be impossible */ {
-    this.regexp = false
-  }
-  return this.regexp
-}
-
-minimatch.match = function (list, pattern, options) {
-  options = options || {}
-  var mm = new Minimatch(pattern, options)
-  list = list.filter(function (f) {
-    return mm.match(f)
-  })
-  if (mm.options.nonull && !list.length) {
-    list.push(pattern)
-  }
-  return list
-}
-
-Minimatch.prototype.match = function match (f, partial) {
-  if (typeof partial === 'undefined') partial = this.partial
-  this.debug('match', f, this.pattern)
-  // short-circuit in the case of busted things.
-  // comments, etc.
-  if (this.comment) return false
-  if (this.empty) return f === ''
-
-  if (f === '/' && partial) return true
-
-  var options = this.options
-
-  // windows: need to use /, not \
-  if (path.sep !== '/') {
-    f = f.split(path.sep).join('/')
-  }
-
-  // treat the test path as a set of pathparts.
-  f = f.split(slashSplit)
-  this.debug(this.pattern, 'split', f)
-
-  // just ONE of the pattern sets in this.set needs to match
-  // in order for it to be valid.  If negating, then just one
-  // match means that we have failed.
-  // Either way, return on the first hit.
-
-  var set = this.set
-  this.debug(this.pattern, 'set', set)
-
-  // Find the basename of the path by looking for the last non-empty segment
-  var filename
-  var i
-  for (i = f.length - 1; i >= 0; i--) {
-    filename = f[i]
-    if (filename) break
-  }
-
-  for (i = 0; i < set.length; i++) {
-    var pattern = set[i]
-    var file = f
-    if (options.matchBase && pattern.length === 1) {
-      file = [filename]
-    }
-    var hit = this.matchOne(file, pattern, partial)
-    if (hit) {
-      if (options.flipNegate) return true
-      return !this.negate
-    }
-  }
-
-  // didn't get any hits.  this is success if it's a negative
-  // pattern, failure otherwise.
-  if (options.flipNegate) return false
-  return this.negate
-}
-
-// set partial to true to test if, for example,
-// "/a/b" matches the start of "/*/b/*/d"
-// Partial means, if you run out of file before you run
-// out of pattern, then that's fine, as long as all
-// the parts match.
-Minimatch.prototype.matchOne = function (file, pattern, partial) {
-  var options = this.options
-
-  this.debug('matchOne',
-    { 'this': this, file: file, pattern: pattern })
-
-  this.debug('matchOne', file.length, pattern.length)
-
-  for (var fi = 0,
-      pi = 0,
-      fl = file.length,
-      pl = pattern.length
-      ; (fi < fl) && (pi < pl)
-      ; fi++, pi++) {
-    this.debug('matchOne loop')
-    var p = pattern[pi]
-    var f = file[fi]
-
-    this.debug(pattern, p, f)
-
-    // should be impossible.
-    // some invalid regexp stuff in the set.
-    /* istanbul ignore if */
-    if (p === false) return false
-
-    if (p === GLOBSTAR) {
-      this.debug('GLOBSTAR', [pattern, p, f])
-
-      // "**"
-      // a/**/b/**/c would match the following:
-      // a/b/x/y/z/c
-      // a/x/y/z/b/c
-      // a/b/x/b/x/c
-      // a/b/c
-      // To do this, take the rest of the pattern after
-      // the **, and see if it would match the file remainder.
-      // If so, return success.
-      // If not, the ** "swallows" a segment, and try again.
-      // This is recursively awful.
-      //
-      // a/**/b/**/c matching a/b/x/y/z/c
-      // - a matches a
-      // - doublestar
-      //   - matchOne(b/x/y/z/c, b/**/c)
-      //     - b matches b
-      //     - doublestar
-      //       - matchOne(x/y/z/c, c) -> no
-      //       - matchOne(y/z/c, c) -> no
-      //       - matchOne(z/c, c) -> no
-      //       - matchOne(c, c) yes, hit
-      var fr = fi
-      var pr = pi + 1
-      if (pr === pl) {
-        this.debug('** at the end')
-        // a ** at the end will just swallow the rest.
-        // We have found a match.
-        // however, it will not swallow /.x, unless
-        // options.dot is set.
-        // . and .. are *never* matched by **, for explosively
-        // exponential reasons.
-        for (; fi < fl; fi++) {
-          if (file[fi] === '.' || file[fi] === '..' ||
-            (!options.dot && file[fi].charAt(0) === '.')) return false
-        }
-        return true
-      }
-
-      // ok, let's see if we can swallow whatever we can.
-      while (fr < fl) {
-        var swallowee = file[fr]
-
-        this.debug('\nglobstar while', file, fr, pattern, pr, swallowee)
-
-        // XXX remove this slice.  Just pass the start index.
-        if (this.matchOne(file.slice(fr), pattern.slice(pr), partial)) {
-          this.debug('globstar found match!', fr, fl, swallowee)
-          // found a match.
-          return true
-        } else {
-          // can't swallow "." or ".." ever.
-          // can only swallow ".foo" when explicitly asked.
-          if (swallowee === '.' || swallowee === '..' ||
-            (!options.dot && swallowee.charAt(0) === '.')) {
-            this.debug('dot detected!', file, fr, pattern, pr)
-            break
-          }
-
-          // ** swallows a segment, and continue.
-          this.debug('globstar swallow a segment, and continue')
-          fr++
-        }
-      }
-
-      // no match was found.
-      // However, in partial mode, we can't say this is necessarily over.
-      // If there's more *pattern* left, then
-      /* istanbul ignore if */
-      if (partial) {
-        // ran out of file
-        this.debug('\n>>> no match, partial?', file, fr, pattern, pr)
-        if (fr === fl) return true
-      }
-      return false
-    }
-
-    // something other than **
-    // non-magic patterns just have to match exactly
-    // patterns with magic have been turned into regexps.
-    var hit
-    if (typeof p === 'string') {
-      hit = f === p
-      this.debug('string match', p, f, hit)
-    } else {
-      hit = f.match(p)
-      this.debug('pattern match', p, f, hit)
-    }
-
-    if (!hit) return false
-  }
-
-  // Note: ending in / means that we'll get a final ""
-  // at the end of the pattern.  This can only match a
-  // corresponding "" at the end of the file.
-  // If the file ends in /, then it can only match a
-  // a pattern that ends in /, unless the pattern just
-  // doesn't have any more for it. But, a/b/ should *not*
-  // match "a/b/*", even though "" matches against the
-  // [^/]*? pattern, except in partial mode, where it might
-  // simply not be reached yet.
-  // However, a/b/ should still satisfy a/*
-
-  // now either we fell off the end of the pattern, or we're done.
-  if (fi === fl && pi === pl) {
-    // ran out of pattern and filename at the same time.
-    // an exact hit!
-    return true
-  } else if (fi === fl) {
-    // ran out of file, but still had pattern left.
-    // this is ok if we're doing the match as part of
-    // a glob fs traversal.
-    return partial
-  } else /* istanbul ignore else */ if (pi === pl) {
-    // ran out of pattern, still have file left.
-    // this is only acceptable if we're on the very last
-    // empty segment of a file with a trailing slash.
-    // a/* should match a/b/
-    return (fi === fl - 1) && (file[fi] === '')
-  }
-
-  // should be unreachable.
-  /* istanbul ignore next */
-  throw new Error('wtf?')
-}
-
-// replace stuff like \* with *
-function globUnescape (s) {
-  return s.replace(/\\(.)/g, '$1')
-}
-
-function regExpEscape (s) {
-  return s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
-}
-
-
-/***/ }),
-
-/***/ 3113:
-/***/ ((module, exports) => {
-
-exports = module.exports = SemVer
-
-var debug
-/* istanbul ignore next */
-if (typeof process === 'object' &&
-    process.env &&
-    process.env.NODE_DEBUG &&
-    /\bsemver\b/i.test(process.env.NODE_DEBUG)) {
-  debug = function () {
-    var args = Array.prototype.slice.call(arguments, 0)
-    args.unshift('SEMVER')
-    console.log.apply(console, args)
-  }
-} else {
-  debug = function () {}
-}
-
-// Note: this is the semver.org version of the spec that it implements
-// Not necessarily the package version of this code.
-exports.SEMVER_SPEC_VERSION = '2.0.0'
-
-var MAX_LENGTH = 256
-var MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER ||
-  /* istanbul ignore next */ 9007199254740991
-
-// Max safe segment length for coercion.
-var MAX_SAFE_COMPONENT_LENGTH = 16
-
-var MAX_SAFE_BUILD_LENGTH = MAX_LENGTH - 6
-
-// The actual regexps go on exports.re
-var re = exports.re = []
-var safeRe = exports.safeRe = []
-var src = exports.src = []
-var t = exports.tokens = {}
-var R = 0
-
-function tok (n) {
-  t[n] = R++
-}
-
-var LETTERDASHNUMBER = '[a-zA-Z0-9-]'
-
-// Replace some greedy regex tokens to prevent regex dos issues. These regex are
-// used internally via the safeRe object since all inputs in this library get
-// normalized first to trim and collapse all extra whitespace. The original
-// regexes are exported for userland consumption and lower level usage. A
-// future breaking change could export the safer regex only with a note that
-// all input should have extra whitespace removed.
-var safeRegexReplacements = [
-  ['\\s', 1],
-  ['\\d', MAX_LENGTH],
-  [LETTERDASHNUMBER, MAX_SAFE_BUILD_LENGTH],
-]
-
-function makeSafeRe (value) {
-  for (var i = 0; i < safeRegexReplacements.length; i++) {
-    var token = safeRegexReplacements[i][0]
-    var max = safeRegexReplacements[i][1]
-    value = value
-      .split(token + '*').join(token + '{0,' + max + '}')
-      .split(token + '+').join(token + '{1,' + max + '}')
-  }
-  return value
-}
-
-// The following Regular Expressions can be used for tokenizing,
-// validating, and parsing SemVer version strings.
-
-// ## Numeric Identifier
-// A single `0`, or a non-zero digit followed by zero or more digits.
-
-tok('NUMERICIDENTIFIER')
-src[t.NUMERICIDENTIFIER] = '0|[1-9]\\d*'
-tok('NUMERICIDENTIFIERLOOSE')
-src[t.NUMERICIDENTIFIERLOOSE] = '\\d+'
-
-// ## Non-numeric Identifier
-// Zero or more digits, followed by a letter or hyphen, and then zero or
-// more letters, digits, or hyphens.
-
-tok('NONNUMERICIDENTIFIER')
-src[t.NONNUMERICIDENTIFIER] = '\\d*[a-zA-Z-]' + LETTERDASHNUMBER + '*'
-
-// ## Main Version
-// Three dot-separated numeric identifiers.
-
-tok('MAINVERSION')
-src[t.MAINVERSION] = '(' + src[t.NUMERICIDENTIFIER] + ')\\.' +
-                   '(' + src[t.NUMERICIDENTIFIER] + ')\\.' +
-                   '(' + src[t.NUMERICIDENTIFIER] + ')'
-
-tok('MAINVERSIONLOOSE')
-src[t.MAINVERSIONLOOSE] = '(' + src[t.NUMERICIDENTIFIERLOOSE] + ')\\.' +
-                        '(' + src[t.NUMERICIDENTIFIERLOOSE] + ')\\.' +
-                        '(' + src[t.NUMERICIDENTIFIERLOOSE] + ')'
-
-// ## Pre-release Version Identifier
-// A numeric identifier, or a non-numeric identifier.
-
-tok('PRERELEASEIDENTIFIER')
-src[t.PRERELEASEIDENTIFIER] = '(?:' + src[t.NUMERICIDENTIFIER] +
-                            '|' + src[t.NONNUMERICIDENTIFIER] + ')'
-
-tok('PRERELEASEIDENTIFIERLOOSE')
-src[t.PRERELEASEIDENTIFIERLOOSE] = '(?:' + src[t.NUMERICIDENTIFIERLOOSE] +
-                                 '|' + src[t.NONNUMERICIDENTIFIER] + ')'
-
-// ## Pre-release Version
-// Hyphen, followed by one or more dot-separated pre-release version
-// identifiers.
-
-tok('PRERELEASE')
-src[t.PRERELEASE] = '(?:-(' + src[t.PRERELEASEIDENTIFIER] +
-                  '(?:\\.' + src[t.PRERELEASEIDENTIFIER] + ')*))'
-
-tok('PRERELEASELOOSE')
-src[t.PRERELEASELOOSE] = '(?:-?(' + src[t.PRERELEASEIDENTIFIERLOOSE] +
-                       '(?:\\.' + src[t.PRERELEASEIDENTIFIERLOOSE] + ')*))'
-
-// ## Build Metadata Identifier
-// Any combination of digits, letters, or hyphens.
-
-tok('BUILDIDENTIFIER')
-src[t.BUILDIDENTIFIER] = LETTERDASHNUMBER + '+'
-
-// ## Build Metadata
-// Plus sign, followed by one or more period-separated build metadata
-// identifiers.
-
-tok('BUILD')
-src[t.BUILD] = '(?:\\+(' + src[t.BUILDIDENTIFIER] +
-             '(?:\\.' + src[t.BUILDIDENTIFIER] + ')*))'
-
-// ## Full Version String
-// A main version, followed optionally by a pre-release version and
-// build metadata.
-
-// Note that the only major, minor, patch, and pre-release sections of
-// the version string are capturing groups.  The build metadata is not a
-// capturing group, because it should not ever be used in version
-// comparison.
-
-tok('FULL')
-tok('FULLPLAIN')
-src[t.FULLPLAIN] = 'v?' + src[t.MAINVERSION] +
-                  src[t.PRERELEASE] + '?' +
-                  src[t.BUILD] + '?'
-
-src[t.FULL] = '^' + src[t.FULLPLAIN] + '$'
-
-// like full, but allows v1.2.3 and =1.2.3, which people do sometimes.
-// also, 1.0.0alpha1 (prerelease without the hyphen) which is pretty
-// common in the npm registry.
-tok('LOOSEPLAIN')
-src[t.LOOSEPLAIN] = '[v=\\s]*' + src[t.MAINVERSIONLOOSE] +
-                  src[t.PRERELEASELOOSE] + '?' +
-                  src[t.BUILD] + '?'
-
-tok('LOOSE')
-src[t.LOOSE] = '^' + src[t.LOOSEPLAIN] + '$'
-
-tok('GTLT')
-src[t.GTLT] = '((?:<|>)?=?)'
-
-// Something like "2.*" or "1.2.x".
-// Note that "x.x" is a valid xRange identifer, meaning "any version"
-// Only the first item is strictly required.
-tok('XRANGEIDENTIFIERLOOSE')
-src[t.XRANGEIDENTIFIERLOOSE] = src[t.NUMERICIDENTIFIERLOOSE] + '|x|X|\\*'
-tok('XRANGEIDENTIFIER')
-src[t.XRANGEIDENTIFIER] = src[t.NUMERICIDENTIFIER] + '|x|X|\\*'
-
-tok('XRANGEPLAIN')
-src[t.XRANGEPLAIN] = '[v=\\s]*(' + src[t.XRANGEIDENTIFIER] + ')' +
-                   '(?:\\.(' + src[t.XRANGEIDENTIFIER] + ')' +
-                   '(?:\\.(' + src[t.XRANGEIDENTIFIER] + ')' +
-                   '(?:' + src[t.PRERELEASE] + ')?' +
-                   src[t.BUILD] + '?' +
-                   ')?)?'
-
-tok('XRANGEPLAINLOOSE')
-src[t.XRANGEPLAINLOOSE] = '[v=\\s]*(' + src[t.XRANGEIDENTIFIERLOOSE] + ')' +
-                        '(?:\\.(' + src[t.XRANGEIDENTIFIERLOOSE] + ')' +
-                        '(?:\\.(' + src[t.XRANGEIDENTIFIERLOOSE] + ')' +
-                        '(?:' + src[t.PRERELEASELOOSE] + ')?' +
-                        src[t.BUILD] + '?' +
-                        ')?)?'
-
-tok('XRANGE')
-src[t.XRANGE] = '^' + src[t.GTLT] + '\\s*' + src[t.XRANGEPLAIN] + '$'
-tok('XRANGELOOSE')
-src[t.XRANGELOOSE] = '^' + src[t.GTLT] + '\\s*' + src[t.XRANGEPLAINLOOSE] + '$'
-
-// Coercion.
-// Extract anything that could conceivably be a part of a valid semver
-tok('COERCE')
-src[t.COERCE] = '(^|[^\\d])' +
-              '(\\d{1,' + MAX_SAFE_COMPONENT_LENGTH + '})' +
-              '(?:\\.(\\d{1,' + MAX_SAFE_COMPONENT_LENGTH + '}))?' +
-              '(?:\\.(\\d{1,' + MAX_SAFE_COMPONENT_LENGTH + '}))?' +
-              '(?:$|[^\\d])'
-tok('COERCERTL')
-re[t.COERCERTL] = new RegExp(src[t.COERCE], 'g')
-safeRe[t.COERCERTL] = new RegExp(makeSafeRe(src[t.COERCE]), 'g')
-
-// Tilde ranges.
-// Meaning is "reasonably at or greater than"
-tok('LONETILDE')
-src[t.LONETILDE] = '(?:~>?)'
-
-tok('TILDETRIM')
-src[t.TILDETRIM] = '(\\s*)' + src[t.LONETILDE] + '\\s+'
-re[t.TILDETRIM] = new RegExp(src[t.TILDETRIM], 'g')
-safeRe[t.TILDETRIM] = new RegExp(makeSafeRe(src[t.TILDETRIM]), 'g')
-var tildeTrimReplace = '$1~'
-
-tok('TILDE')
-src[t.TILDE] = '^' + src[t.LONETILDE] + src[t.XRANGEPLAIN] + '$'
-tok('TILDELOOSE')
-src[t.TILDELOOSE] = '^' + src[t.LONETILDE] + src[t.XRANGEPLAINLOOSE] + '$'
-
-// Caret ranges.
-// Meaning is "at least and backwards compatible with"
-tok('LONECARET')
-src[t.LONECARET] = '(?:\\^)'
-
-tok('CARETTRIM')
-src[t.CARETTRIM] = '(\\s*)' + src[t.LONECARET] + '\\s+'
-re[t.CARETTRIM] = new RegExp(src[t.CARETTRIM], 'g')
-safeRe[t.CARETTRIM] = new RegExp(makeSafeRe(src[t.CARETTRIM]), 'g')
-var caretTrimReplace = '$1^'
-
-tok('CARET')
-src[t.CARET] = '^' + src[t.LONECARET] + src[t.XRANGEPLAIN] + '$'
-tok('CARETLOOSE')
-src[t.CARETLOOSE] = '^' + src[t.LONECARET] + src[t.XRANGEPLAINLOOSE] + '$'
-
-// A simple gt/lt/eq thing, or just "" to indicate "any version"
-tok('COMPARATORLOOSE')
-src[t.COMPARATORLOOSE] = '^' + src[t.GTLT] + '\\s*(' + src[t.LOOSEPLAIN] + ')$|^$'
-tok('COMPARATOR')
-src[t.COMPARATOR] = '^' + src[t.GTLT] + '\\s*(' + src[t.FULLPLAIN] + ')$|^$'
-
-// An expression to strip any whitespace between the gtlt and the thing
-// it modifies, so that `> 1.2.3` ==> `>1.2.3`
-tok('COMPARATORTRIM')
-src[t.COMPARATORTRIM] = '(\\s*)' + src[t.GTLT] +
-                      '\\s*(' + src[t.LOOSEPLAIN] + '|' + src[t.XRANGEPLAIN] + ')'
-
-// this one has to use the /g flag
-re[t.COMPARATORTRIM] = new RegExp(src[t.COMPARATORTRIM], 'g')
-safeRe[t.COMPARATORTRIM] = new RegExp(makeSafeRe(src[t.COMPARATORTRIM]), 'g')
-var comparatorTrimReplace = '$1$2$3'
-
-// Something like `1.2.3 - 1.2.4`
-// Note that these all use the loose form, because they'll be
-// checked against either the strict or loose comparator form
-// later.
-tok('HYPHENRANGE')
-src[t.HYPHENRANGE] = '^\\s*(' + src[t.XRANGEPLAIN] + ')' +
-                   '\\s+-\\s+' +
-                   '(' + src[t.XRANGEPLAIN] + ')' +
-                   '\\s*$'
-
-tok('HYPHENRANGELOOSE')
-src[t.HYPHENRANGELOOSE] = '^\\s*(' + src[t.XRANGEPLAINLOOSE] + ')' +
-                        '\\s+-\\s+' +
-                        '(' + src[t.XRANGEPLAINLOOSE] + ')' +
-                        '\\s*$'
-
-// Star ranges basically just allow anything at all.
-tok('STAR')
-src[t.STAR] = '(<|>)?=?\\s*\\*'
-
-// Compile to actual regexp objects.
-// All are flag-free, unless they were created above with a flag.
-for (var i = 0; i < R; i++) {
-  debug(i, src[i])
-  if (!re[i]) {
-    re[i] = new RegExp(src[i])
-
-    // Replace all greedy whitespace to prevent regex dos issues. These regex are
-    // used internally via the safeRe object since all inputs in this library get
-    // normalized first to trim and collapse all extra whitespace. The original
-    // regexes are exported for userland consumption and lower level usage. A
-    // future breaking change could export the safer regex only with a note that
-    // all input should have extra whitespace removed.
-    safeRe[i] = new RegExp(makeSafeRe(src[i]))
-  }
-}
-
-exports.parse = parse
-function parse (version, options) {
-  if (!options || typeof options !== 'object') {
-    options = {
-      loose: !!options,
-      includePrerelease: false
-    }
-  }
-
-  if (version instanceof SemVer) {
-    return version
-  }
-
-  if (typeof version !== 'string') {
-    return null
-  }
-
-  if (version.length > MAX_LENGTH) {
-    return null
-  }
-
-  var r = options.loose ? safeRe[t.LOOSE] : safeRe[t.FULL]
-  if (!r.test(version)) {
-    return null
-  }
-
-  try {
-    return new SemVer(version, options)
-  } catch (er) {
-    return null
-  }
-}
-
-exports.valid = valid
-function valid (version, options) {
-  var v = parse(version, options)
-  return v ? v.version : null
-}
-
-exports.clean = clean
-function clean (version, options) {
-  var s = parse(version.trim().replace(/^[=v]+/, ''), options)
-  return s ? s.version : null
-}
-
-exports.SemVer = SemVer
-
-function SemVer (version, options) {
-  if (!options || typeof options !== 'object') {
-    options = {
-      loose: !!options,
-      includePrerelease: false
-    }
-  }
-  if (version instanceof SemVer) {
-    if (version.loose === options.loose) {
-      return version
-    } else {
-      version = version.version
-    }
-  } else if (typeof version !== 'string') {
-    throw new TypeError('Invalid Version: ' + version)
-  }
-
-  if (version.length > MAX_LENGTH) {
-    throw new TypeError('version is longer than ' + MAX_LENGTH + ' characters')
-  }
-
-  if (!(this instanceof SemVer)) {
-    return new SemVer(version, options)
-  }
-
-  debug('SemVer', version, options)
-  this.options = options
-  this.loose = !!options.loose
-
-  var m = version.trim().match(options.loose ? safeRe[t.LOOSE] : safeRe[t.FULL])
-
-  if (!m) {
-    throw new TypeError('Invalid Version: ' + version)
-  }
-
-  this.raw = version
-
-  // these are actually numbers
-  this.major = +m[1]
-  this.minor = +m[2]
-  this.patch = +m[3]
-
-  if (this.major > MAX_SAFE_INTEGER || this.major < 0) {
-    throw new TypeError('Invalid major version')
-  }
-
-  if (this.minor > MAX_SAFE_INTEGER || this.minor < 0) {
-    throw new TypeError('Invalid minor version')
-  }
-
-  if (this.patch > MAX_SAFE_INTEGER || this.patch < 0) {
-    throw new TypeError('Invalid patch version')
-  }
-
-  // numberify any prerelease numeric ids
-  if (!m[4]) {
-    this.prerelease = []
-  } else {
-    this.prerelease = m[4].split('.').map(function (id) {
-      if (/^[0-9]+$/.test(id)) {
-        var num = +id
-        if (num >= 0 && num < MAX_SAFE_INTEGER) {
-          return num
-        }
-      }
-      return id
-    })
-  }
-
-  this.build = m[5] ? m[5].split('.') : []
-  this.format()
-}
-
-SemVer.prototype.format = function () {
-  this.version = this.major + '.' + this.minor + '.' + this.patch
-  if (this.prerelease.length) {
-    this.version += '-' + this.prerelease.join('.')
-  }
-  return this.version
-}
-
-SemVer.prototype.toString = function () {
-  return this.version
-}
-
-SemVer.prototype.compare = function (other) {
-  debug('SemVer.compare', this.version, this.options, other)
-  if (!(other instanceof SemVer)) {
-    other = new SemVer(other, this.options)
-  }
-
-  return this.compareMain(other) || this.comparePre(other)
-}
-
-SemVer.prototype.compareMain = function (other) {
-  if (!(other instanceof SemVer)) {
-    other = new SemVer(other, this.options)
-  }
-
-  return compareIdentifiers(this.major, other.major) ||
-         compareIdentifiers(this.minor, other.minor) ||
-         compareIdentifiers(this.patch, other.patch)
-}
-
-SemVer.prototype.comparePre = function (other) {
-  if (!(other instanceof SemVer)) {
-    other = new SemVer(other, this.options)
-  }
-
-  // NOT having a prerelease is > having one
-  if (this.prerelease.length && !other.prerelease.length) {
-    return -1
-  } else if (!this.prerelease.length && other.prerelease.length) {
-    return 1
-  } else if (!this.prerelease.length && !other.prerelease.length) {
-    return 0
-  }
-
-  var i = 0
-  do {
-    var a = this.prerelease[i]
-    var b = other.prerelease[i]
-    debug('prerelease compare', i, a, b)
-    if (a === undefined && b === undefined) {
-      return 0
-    } else if (b === undefined) {
-      return 1
-    } else if (a === undefined) {
-      return -1
-    } else if (a === b) {
-      continue
-    } else {
-      return compareIdentifiers(a, b)
-    }
-  } while (++i)
-}
-
-SemVer.prototype.compareBuild = function (other) {
-  if (!(other instanceof SemVer)) {
-    other = new SemVer(other, this.options)
-  }
-
-  var i = 0
-  do {
-    var a = this.build[i]
-    var b = other.build[i]
-    debug('prerelease compare', i, a, b)
-    if (a === undefined && b === undefined) {
-      return 0
-    } else if (b === undefined) {
-      return 1
-    } else if (a === undefined) {
-      return -1
-    } else if (a === b) {
-      continue
-    } else {
-      return compareIdentifiers(a, b)
-    }
-  } while (++i)
-}
-
-// preminor will bump the version up to the next minor release, and immediately
-// down to pre-release. premajor and prepatch work the same way.
-SemVer.prototype.inc = function (release, identifier) {
-  switch (release) {
-    case 'premajor':
-      this.prerelease.length = 0
-      this.patch = 0
-      this.minor = 0
-      this.major++
-      this.inc('pre', identifier)
-      break
-    case 'preminor':
-      this.prerelease.length = 0
-      this.patch = 0
-      this.minor++
-      this.inc('pre', identifier)
-      break
-    case 'prepatch':
-      // If this is already a prerelease, it will bump to the next version
-      // drop any prereleases that might already exist, since they are not
-      // relevant at this point.
-      this.prerelease.length = 0
-      this.inc('patch', identifier)
-      this.inc('pre', identifier)
-      break
-    // If the input is a non-prerelease version, this acts the same as
-    // prepatch.
-    case 'prerelease':
-      if (this.prerelease.length === 0) {
-        this.inc('patch', identifier)
-      }
-      this.inc('pre', identifier)
-      break
-
-    case 'major':
-      // If this is a pre-major version, bump up to the same major version.
-      // Otherwise increment major.
-      // 1.0.0-5 bumps to 1.0.0
-      // 1.1.0 bumps to 2.0.0
-      if (this.minor !== 0 ||
-          this.patch !== 0 ||
-          this.prerelease.length === 0) {
-        this.major++
-      }
-      this.minor = 0
-      this.patch = 0
-      this.prerelease = []
-      break
-    case 'minor':
-      // If this is a pre-minor version, bump up to the same minor version.
-      // Otherwise increment minor.
-      // 1.2.0-5 bumps to 1.2.0
-      // 1.2.1 bumps to 1.3.0
-      if (this.patch !== 0 || this.prerelease.length === 0) {
-        this.minor++
-      }
-      this.patch = 0
-      this.prerelease = []
-      break
-    case 'patch':
-      // If this is not a pre-release version, it will increment the patch.
-      // If it is a pre-release it will bump up to the same patch version.
-      // 1.2.0-5 patches to 1.2.0
-      // 1.2.0 patches to 1.2.1
-      if (this.prerelease.length === 0) {
-        this.patch++
-      }
-      this.prerelease = []
-      break
-    // This probably shouldn't be used publicly.
-    // 1.0.0 "pre" would become 1.0.0-0 which is the wrong direction.
-    case 'pre':
-      if (this.prerelease.length === 0) {
-        this.prerelease = [0]
-      } else {
-        var i = this.prerelease.length
-        while (--i >= 0) {
-          if (typeof this.prerelease[i] === 'number') {
-            this.prerelease[i]++
-            i = -2
-          }
-        }
-        if (i === -1) {
-          // didn't increment anything
-          this.prerelease.push(0)
-        }
-      }
-      if (identifier) {
-        // 1.2.0-beta.1 bumps to 1.2.0-beta.2,
-        // 1.2.0-beta.fooblz or 1.2.0-beta bumps to 1.2.0-beta.0
-        if (this.prerelease[0] === identifier) {
-          if (isNaN(this.prerelease[1])) {
-            this.prerelease = [identifier, 0]
-          }
-        } else {
-          this.prerelease = [identifier, 0]
-        }
-      }
-      break
-
-    default:
-      throw new Error('invalid increment argument: ' + release)
-  }
-  this.format()
-  this.raw = this.version
-  return this
-}
-
-exports.inc = inc
-function inc (version, release, loose, identifier) {
-  if (typeof (loose) === 'string') {
-    identifier = loose
-    loose = undefined
-  }
-
-  try {
-    return new SemVer(version, loose).inc(release, identifier).version
-  } catch (er) {
-    return null
-  }
-}
-
-exports.diff = diff
-function diff (version1, version2) {
-  if (eq(version1, version2)) {
-    return null
-  } else {
-    var v1 = parse(version1)
-    var v2 = parse(version2)
-    var prefix = ''
-    if (v1.prerelease.length || v2.prerelease.length) {
-      prefix = 'pre'
-      var defaultResult = 'prerelease'
-    }
-    for (var key in v1) {
-      if (key === 'major' || key === 'minor' || key === 'patch') {
-        if (v1[key] !== v2[key]) {
-          return prefix + key
-        }
-      }
-    }
-    return defaultResult // may be undefined
-  }
-}
-
-exports.compareIdentifiers = compareIdentifiers
-
-var numeric = /^[0-9]+$/
-function compareIdentifiers (a, b) {
-  var anum = numeric.test(a)
-  var bnum = numeric.test(b)
-
-  if (anum && bnum) {
-    a = +a
-    b = +b
-  }
-
-  return a === b ? 0
-    : (anum && !bnum) ? -1
-    : (bnum && !anum) ? 1
-    : a < b ? -1
-    : 1
-}
-
-exports.rcompareIdentifiers = rcompareIdentifiers
-function rcompareIdentifiers (a, b) {
-  return compareIdentifiers(b, a)
-}
-
-exports.major = major
-function major (a, loose) {
-  return new SemVer(a, loose).major
-}
-
-exports.minor = minor
-function minor (a, loose) {
-  return new SemVer(a, loose).minor
-}
-
-exports.patch = patch
-function patch (a, loose) {
-  return new SemVer(a, loose).patch
-}
-
-exports.compare = compare
-function compare (a, b, loose) {
-  return new SemVer(a, loose).compare(new SemVer(b, loose))
-}
-
-exports.compareLoose = compareLoose
-function compareLoose (a, b) {
-  return compare(a, b, true)
-}
-
-exports.compareBuild = compareBuild
-function compareBuild (a, b, loose) {
-  var versionA = new SemVer(a, loose)
-  var versionB = new SemVer(b, loose)
-  return versionA.compare(versionB) || versionA.compareBuild(versionB)
-}
-
-exports.rcompare = rcompare
-function rcompare (a, b, loose) {
-  return compare(b, a, loose)
-}
-
-exports.sort = sort
-function sort (list, loose) {
-  return list.sort(function (a, b) {
-    return exports.compareBuild(a, b, loose)
-  })
-}
-
-exports.rsort = rsort
-function rsort (list, loose) {
-  return list.sort(function (a, b) {
-    return exports.compareBuild(b, a, loose)
-  })
-}
-
-exports.gt = gt
-function gt (a, b, loose) {
-  return compare(a, b, loose) > 0
-}
-
-exports.lt = lt
-function lt (a, b, loose) {
-  return compare(a, b, loose) < 0
-}
-
-exports.eq = eq
-function eq (a, b, loose) {
-  return compare(a, b, loose) === 0
-}
-
-exports.neq = neq
-function neq (a, b, loose) {
-  return compare(a, b, loose) !== 0
-}
-
-exports.gte = gte
-function gte (a, b, loose) {
-  return compare(a, b, loose) >= 0
-}
-
-exports.lte = lte
-function lte (a, b, loose) {
-  return compare(a, b, loose) <= 0
-}
-
-exports.cmp = cmp
-function cmp (a, op, b, loose) {
-  switch (op) {
-    case '===':
-      if (typeof a === 'object')
-        a = a.version
-      if (typeof b === 'object')
-        b = b.version
-      return a === b
-
-    case '!==':
-      if (typeof a === 'object')
-        a = a.version
-      if (typeof b === 'object')
-        b = b.version
-      return a !== b
-
-    case '':
-    case '=':
-    case '==':
-      return eq(a, b, loose)
-
-    case '!=':
-      return neq(a, b, loose)
-
-    case '>':
-      return gt(a, b, loose)
-
-    case '>=':
-      return gte(a, b, loose)
-
-    case '<':
-      return lt(a, b, loose)
-
-    case '<=':
-      return lte(a, b, loose)
-
-    default:
-      throw new TypeError('Invalid operator: ' + op)
-  }
-}
-
-exports.Comparator = Comparator
-function Comparator (comp, options) {
-  if (!options || typeof options !== 'object') {
-    options = {
-      loose: !!options,
-      includePrerelease: false
-    }
-  }
-
-  if (comp instanceof Comparator) {
-    if (comp.loose === !!options.loose) {
-      return comp
-    } else {
-      comp = comp.value
-    }
-  }
-
-  if (!(this instanceof Comparator)) {
-    return new Comparator(comp, options)
-  }
-
-  comp = comp.trim().split(/\s+/).join(' ')
-  debug('comparator', comp, options)
-  this.options = options
-  this.loose = !!options.loose
-  this.parse(comp)
-
-  if (this.semver === ANY) {
-    this.value = ''
-  } else {
-    this.value = this.operator + this.semver.version
-  }
-
-  debug('comp', this)
-}
-
-var ANY = {}
-Comparator.prototype.parse = function (comp) {
-  var r = this.options.loose ? safeRe[t.COMPARATORLOOSE] : safeRe[t.COMPARATOR]
-  var m = comp.match(r)
-
-  if (!m) {
-    throw new TypeError('Invalid comparator: ' + comp)
-  }
-
-  this.operator = m[1] !== undefined ? m[1] : ''
-  if (this.operator === '=') {
-    this.operator = ''
-  }
-
-  // if it literally is just '>' or '' then allow anything.
-  if (!m[2]) {
-    this.semver = ANY
-  } else {
-    this.semver = new SemVer(m[2], this.options.loose)
-  }
-}
-
-Comparator.prototype.toString = function () {
-  return this.value
-}
-
-Comparator.prototype.test = function (version) {
-  debug('Comparator.test', version, this.options.loose)
-
-  if (this.semver === ANY || version === ANY) {
-    return true
-  }
-
-  if (typeof version === 'string') {
-    try {
-      version = new SemVer(version, this.options)
-    } catch (er) {
-      return false
-    }
-  }
-
-  return cmp(version, this.operator, this.semver, this.options)
-}
-
-Comparator.prototype.intersects = function (comp, options) {
-  if (!(comp instanceof Comparator)) {
-    throw new TypeError('a Comparator is required')
-  }
-
-  if (!options || typeof options !== 'object') {
-    options = {
-      loose: !!options,
-      includePrerelease: false
-    }
-  }
-
-  var rangeTmp
-
-  if (this.operator === '') {
-    if (this.value === '') {
-      return true
-    }
-    rangeTmp = new Range(comp.value, options)
-    return satisfies(this.value, rangeTmp, options)
-  } else if (comp.operator === '') {
-    if (comp.value === '') {
-      return true
-    }
-    rangeTmp = new Range(this.value, options)
-    return satisfies(comp.semver, rangeTmp, options)
-  }
-
-  var sameDirectionIncreasing =
-    (this.operator === '>=' || this.operator === '>') &&
-    (comp.operator === '>=' || comp.operator === '>')
-  var sameDirectionDecreasing =
-    (this.operator === '<=' || this.operator === '<') &&
-    (comp.operator === '<=' || comp.operator === '<')
-  var sameSemVer = this.semver.version === comp.semver.version
-  var differentDirectionsInclusive =
-    (this.operator === '>=' || this.operator === '<=') &&
-    (comp.operator === '>=' || comp.operator === '<=')
-  var oppositeDirectionsLessThan =
-    cmp(this.semver, '<', comp.semver, options) &&
-    ((this.operator === '>=' || this.operator === '>') &&
-    (comp.operator === '<=' || comp.operator === '<'))
-  var oppositeDirectionsGreaterThan =
-    cmp(this.semver, '>', comp.semver, options) &&
-    ((this.operator === '<=' || this.operator === '<') &&
-    (comp.operator === '>=' || comp.operator === '>'))
-
-  return sameDirectionIncreasing || sameDirectionDecreasing ||
-    (sameSemVer && differentDirectionsInclusive) ||
-    oppositeDirectionsLessThan || oppositeDirectionsGreaterThan
-}
-
-exports.Range = Range
-function Range (range, options) {
-  if (!options || typeof options !== 'object') {
-    options = {
-      loose: !!options,
-      includePrerelease: false
-    }
-  }
-
-  if (range instanceof Range) {
-    if (range.loose === !!options.loose &&
-        range.includePrerelease === !!options.includePrerelease) {
-      return range
-    } else {
-      return new Range(range.raw, options)
-    }
-  }
-
-  if (range instanceof Comparator) {
-    return new Range(range.value, options)
-  }
-
-  if (!(this instanceof Range)) {
-    return new Range(range, options)
-  }
-
-  this.options = options
-  this.loose = !!options.loose
-  this.includePrerelease = !!options.includePrerelease
-
-  // First reduce all whitespace as much as possible so we do not have to rely
-  // on potentially slow regexes like \s*. This is then stored and used for
-  // future error messages as well.
-  this.raw = range
-    .trim()
-    .split(/\s+/)
-    .join(' ')
-
-  // First, split based on boolean or ||
-  this.set = this.raw.split('||').map(function (range) {
-    return this.parseRange(range.trim())
-  }, this).filter(function (c) {
-    // throw out any that are not relevant for whatever reason
-    return c.length
-  })
-
-  if (!this.set.length) {
-    throw new TypeError('Invalid SemVer Range: ' + this.raw)
-  }
-
-  this.format()
-}
-
-Range.prototype.format = function () {
-  this.range = this.set.map(function (comps) {
-    return comps.join(' ').trim()
-  }).join('||').trim()
-  return this.range
-}
-
-Range.prototype.toString = function () {
-  return this.range
-}
-
-Range.prototype.parseRange = function (range) {
-  var loose = this.options.loose
-  // `1.2.3 - 1.2.4` => `>=1.2.3 <=1.2.4`
-  var hr = loose ? safeRe[t.HYPHENRANGELOOSE] : safeRe[t.HYPHENRANGE]
-  range = range.replace(hr, hyphenReplace)
-  debug('hyphen replace', range)
-  // `> 1.2.3 < 1.2.5` => `>1.2.3 <1.2.5`
-  range = range.replace(safeRe[t.COMPARATORTRIM], comparatorTrimReplace)
-  debug('comparator trim', range, safeRe[t.COMPARATORTRIM])
-
-  // `~ 1.2.3` => `~1.2.3`
-  range = range.replace(safeRe[t.TILDETRIM], tildeTrimReplace)
-
-  // `^ 1.2.3` => `^1.2.3`
-  range = range.replace(safeRe[t.CARETTRIM], caretTrimReplace)
-
-  // normalize spaces
-  range = range.split(/\s+/).join(' ')
-
-  // At this point, the range is completely trimmed and
-  // ready to be split into comparators.
-
-  var compRe = loose ? safeRe[t.COMPARATORLOOSE] : safeRe[t.COMPARATOR]
-  var set = range.split(' ').map(function (comp) {
-    return parseComparator(comp, this.options)
-  }, this).join(' ').split(/\s+/)
-  if (this.options.loose) {
-    // in loose mode, throw out any that are not valid comparators
-    set = set.filter(function (comp) {
-      return !!comp.match(compRe)
-    })
-  }
-  set = set.map(function (comp) {
-    return new Comparator(comp, this.options)
-  }, this)
-
-  return set
-}
-
-Range.prototype.intersects = function (range, options) {
-  if (!(range instanceof Range)) {
-    throw new TypeError('a Range is required')
-  }
-
-  return this.set.some(function (thisComparators) {
-    return (
-      isSatisfiable(thisComparators, options) &&
-      range.set.some(function (rangeComparators) {
-        return (
-          isSatisfiable(rangeComparators, options) &&
-          thisComparators.every(function (thisComparator) {
-            return rangeComparators.every(function (rangeComparator) {
-              return thisComparator.intersects(rangeComparator, options)
-            })
-          })
-        )
-      })
-    )
-  })
-}
-
-// take a set of comparators and determine whether there
-// exists a version which can satisfy it
-function isSatisfiable (comparators, options) {
-  var result = true
-  var remainingComparators = comparators.slice()
-  var testComparator = remainingComparators.pop()
-
-  while (result && remainingComparators.length) {
-    result = remainingComparators.every(function (otherComparator) {
-      return testComparator.intersects(otherComparator, options)
-    })
-
-    testComparator = remainingComparators.pop()
-  }
-
-  return result
-}
-
-// Mostly just for testing and legacy API reasons
-exports.toComparators = toComparators
-function toComparators (range, options) {
-  return new Range(range, options).set.map(function (comp) {
-    return comp.map(function (c) {
-      return c.value
-    }).join(' ').trim().split(' ')
-  })
-}
-
-// comprised of xranges, tildes, stars, and gtlt's at this point.
-// already replaced the hyphen ranges
-// turn into a set of JUST comparators.
-function parseComparator (comp, options) {
-  debug('comp', comp, options)
-  comp = replaceCarets(comp, options)
-  debug('caret', comp)
-  comp = replaceTildes(comp, options)
-  debug('tildes', comp)
-  comp = replaceXRanges(comp, options)
-  debug('xrange', comp)
-  comp = replaceStars(comp, options)
-  debug('stars', comp)
-  return comp
-}
-
-function isX (id) {
-  return !id || id.toLowerCase() === 'x' || id === '*'
-}
-
-// ~, ~> --> * (any, kinda silly)
-// ~2, ~2.x, ~2.x.x, ~>2, ~>2.x ~>2.x.x --> >=2.0.0 <3.0.0
-// ~2.0, ~2.0.x, ~>2.0, ~>2.0.x --> >=2.0.0 <2.1.0
-// ~1.2, ~1.2.x, ~>1.2, ~>1.2.x --> >=1.2.0 <1.3.0
-// ~1.2.3, ~>1.2.3 --> >=1.2.3 <1.3.0
-// ~1.2.0, ~>1.2.0 --> >=1.2.0 <1.3.0
-function replaceTildes (comp, options) {
-  return comp.trim().split(/\s+/).map(function (comp) {
-    return replaceTilde(comp, options)
-  }).join(' ')
-}
-
-function replaceTilde (comp, options) {
-  var r = options.loose ? safeRe[t.TILDELOOSE] : safeRe[t.TILDE]
-  return comp.replace(r, function (_, M, m, p, pr) {
-    debug('tilde', comp, _, M, m, p, pr)
-    var ret
-
-    if (isX(M)) {
-      ret = ''
-    } else if (isX(m)) {
-      ret = '>=' + M + '.0.0 <' + (+M + 1) + '.0.0'
-    } else if (isX(p)) {
-      // ~1.2 == >=1.2.0 <1.3.0
-      ret = '>=' + M + '.' + m + '.0 <' + M + '.' + (+m + 1) + '.0'
-    } else if (pr) {
-      debug('replaceTilde pr', pr)
-      ret = '>=' + M + '.' + m + '.' + p + '-' + pr +
-            ' <' + M + '.' + (+m + 1) + '.0'
-    } else {
-      // ~1.2.3 == >=1.2.3 <1.3.0
-      ret = '>=' + M + '.' + m + '.' + p +
-            ' <' + M + '.' + (+m + 1) + '.0'
-    }
-
-    debug('tilde return', ret)
-    return ret
-  })
-}
-
-// ^ --> * (any, kinda silly)
-// ^2, ^2.x, ^2.x.x --> >=2.0.0 <3.0.0
-// ^2.0, ^2.0.x --> >=2.0.0 <3.0.0
-// ^1.2, ^1.2.x --> >=1.2.0 <2.0.0
-// ^1.2.3 --> >=1.2.3 <2.0.0
-// ^1.2.0 --> >=1.2.0 <2.0.0
-function replaceCarets (comp, options) {
-  return comp.trim().split(/\s+/).map(function (comp) {
-    return replaceCaret(comp, options)
-  }).join(' ')
-}
-
-function replaceCaret (comp, options) {
-  debug('caret', comp, options)
-  var r = options.loose ? safeRe[t.CARETLOOSE] : safeRe[t.CARET]
-  return comp.replace(r, function (_, M, m, p, pr) {
-    debug('caret', comp, _, M, m, p, pr)
-    var ret
-
-    if (isX(M)) {
-      ret = ''
-    } else if (isX(m)) {
-      ret = '>=' + M + '.0.0 <' + (+M + 1) + '.0.0'
-    } else if (isX(p)) {
-      if (M === '0') {
-        ret = '>=' + M + '.' + m + '.0 <' + M + '.' + (+m + 1) + '.0'
-      } else {
-        ret = '>=' + M + '.' + m + '.0 <' + (+M + 1) + '.0.0'
-      }
-    } else if (pr) {
-      debug('replaceCaret pr', pr)
-      if (M === '0') {
-        if (m === '0') {
-          ret = '>=' + M + '.' + m + '.' + p + '-' + pr +
-                ' <' + M + '.' + m + '.' + (+p + 1)
-        } else {
-          ret = '>=' + M + '.' + m + '.' + p + '-' + pr +
-                ' <' + M + '.' + (+m + 1) + '.0'
-        }
-      } else {
-        ret = '>=' + M + '.' + m + '.' + p + '-' + pr +
-              ' <' + (+M + 1) + '.0.0'
-      }
-    } else {
-      debug('no pr')
-      if (M === '0') {
-        if (m === '0') {
-          ret = '>=' + M + '.' + m + '.' + p +
-                ' <' + M + '.' + m + '.' + (+p + 1)
-        } else {
-          ret = '>=' + M + '.' + m + '.' + p +
-                ' <' + M + '.' + (+m + 1) + '.0'
-        }
-      } else {
-        ret = '>=' + M + '.' + m + '.' + p +
-              ' <' + (+M + 1) + '.0.0'
-      }
-    }
-
-    debug('caret return', ret)
-    return ret
-  })
-}
-
-function replaceXRanges (comp, options) {
-  debug('replaceXRanges', comp, options)
-  return comp.split(/\s+/).map(function (comp) {
-    return replaceXRange(comp, options)
-  }).join(' ')
-}
-
-function replaceXRange (comp, options) {
-  comp = comp.trim()
-  var r = options.loose ? safeRe[t.XRANGELOOSE] : safeRe[t.XRANGE]
-  return comp.replace(r, function (ret, gtlt, M, m, p, pr) {
-    debug('xRange', comp, ret, gtlt, M, m, p, pr)
-    var xM = isX(M)
-    var xm = xM || isX(m)
-    var xp = xm || isX(p)
-    var anyX = xp
-
-    if (gtlt === '=' && anyX) {
-      gtlt = ''
-    }
-
-    // if we're including prereleases in the match, then we need
-    // to fix this to -0, the lowest possible prerelease value
-    pr = options.includePrerelease ? '-0' : ''
-
-    if (xM) {
-      if (gtlt === '>' || gtlt === '<') {
-        // nothing is allowed
-        ret = '<0.0.0-0'
-      } else {
-        // nothing is forbidden
-        ret = '*'
-      }
-    } else if (gtlt && anyX) {
-      // we know patch is an x, because we have any x at all.
-      // replace X with 0
-      if (xm) {
-        m = 0
-      }
-      p = 0
-
-      if (gtlt === '>') {
-        // >1 => >=2.0.0
-        // >1.2 => >=1.3.0
-        // >1.2.3 => >= 1.2.4
-        gtlt = '>='
-        if (xm) {
-          M = +M + 1
-          m = 0
-          p = 0
-        } else {
-          m = +m + 1
-          p = 0
-        }
-      } else if (gtlt === '<=') {
-        // <=0.7.x is actually <0.8.0, since any 0.7.x should
-        // pass.  Similarly, <=7.x is actually <8.0.0, etc.
-        gtlt = '<'
-        if (xm) {
-          M = +M + 1
-        } else {
-          m = +m + 1
-        }
-      }
-
-      ret = gtlt + M + '.' + m + '.' + p + pr
-    } else if (xm) {
-      ret = '>=' + M + '.0.0' + pr + ' <' + (+M + 1) + '.0.0' + pr
-    } else if (xp) {
-      ret = '>=' + M + '.' + m + '.0' + pr +
-        ' <' + M + '.' + (+m + 1) + '.0' + pr
-    }
-
-    debug('xRange return', ret)
-
-    return ret
-  })
-}
-
-// Because * is AND-ed with everything else in the comparator,
-// and '' means "any version", just remove the *s entirely.
-function replaceStars (comp, options) {
-  debug('replaceStars', comp, options)
-  // Looseness is ignored here.  star is always as loose as it gets!
-  return comp.trim().replace(safeRe[t.STAR], '')
-}
-
-// This function is passed to string.replace(re[t.HYPHENRANGE])
-// M, m, patch, prerelease, build
-// 1.2 - 3.4.5 => >=1.2.0 <=3.4.5
-// 1.2.3 - 3.4 => >=1.2.0 <3.5.0 Any 3.4.x will do
-// 1.2 - 3.4 => >=1.2.0 <3.5.0
-function hyphenReplace ($0,
-  from, fM, fm, fp, fpr, fb,
-  to, tM, tm, tp, tpr, tb) {
-  if (isX(fM)) {
-    from = ''
-  } else if (isX(fm)) {
-    from = '>=' + fM + '.0.0'
-  } else if (isX(fp)) {
-    from = '>=' + fM + '.' + fm + '.0'
-  } else {
-    from = '>=' + from
-  }
-
-  if (isX(tM)) {
-    to = ''
-  } else if (isX(tm)) {
-    to = '<' + (+tM + 1) + '.0.0'
-  } else if (isX(tp)) {
-    to = '<' + tM + '.' + (+tm + 1) + '.0'
-  } else if (tpr) {
-    to = '<=' + tM + '.' + tm + '.' + tp + '-' + tpr
-  } else {
-    to = '<=' + to
-  }
-
-  return (from + ' ' + to).trim()
-}
-
-// if ANY of the sets match ALL of its comparators, then pass
-Range.prototype.test = function (version) {
-  if (!version) {
-    return false
-  }
-
-  if (typeof version === 'string') {
-    try {
-      version = new SemVer(version, this.options)
-    } catch (er) {
-      return false
-    }
-  }
-
-  for (var i = 0; i < this.set.length; i++) {
-    if (testSet(this.set[i], version, this.options)) {
-      return true
-    }
-  }
-  return false
-}
-
-function testSet (set, version, options) {
-  for (var i = 0; i < set.length; i++) {
-    if (!set[i].test(version)) {
-      return false
-    }
-  }
-
-  if (version.prerelease.length && !options.includePrerelease) {
-    // Find the set of versions that are allowed to have prereleases
-    // For example, ^1.2.3-pr.1 desugars to >=1.2.3-pr.1 <2.0.0
-    // That should allow `1.2.3-pr.2` to pass.
-    // However, `1.2.4-alpha.notready` should NOT be allowed,
-    // even though it's within the range set by the comparators.
-    for (i = 0; i < set.length; i++) {
-      debug(set[i].semver)
-      if (set[i].semver === ANY) {
-        continue
-      }
-
-      if (set[i].semver.prerelease.length > 0) {
-        var allowed = set[i].semver
-        if (allowed.major === version.major &&
-            allowed.minor === version.minor &&
-            allowed.patch === version.patch) {
-          return true
-        }
-      }
-    }
-
-    // Version has a -pre, but it's not one of the ones we like.
-    return false
-  }
-
-  return true
-}
-
-exports.satisfies = satisfies
-function satisfies (version, range, options) {
-  try {
-    range = new Range(range, options)
-  } catch (er) {
-    return false
-  }
-  return range.test(version)
-}
-
-exports.maxSatisfying = maxSatisfying
-function maxSatisfying (versions, range, options) {
-  var max = null
-  var maxSV = null
-  try {
-    var rangeObj = new Range(range, options)
-  } catch (er) {
-    return null
-  }
-  versions.forEach(function (v) {
-    if (rangeObj.test(v)) {
-      // satisfies(v, range, options)
-      if (!max || maxSV.compare(v) === -1) {
-        // compare(max, v, true)
-        max = v
-        maxSV = new SemVer(max, options)
-      }
-    }
-  })
-  return max
-}
-
-exports.minSatisfying = minSatisfying
-function minSatisfying (versions, range, options) {
-  var min = null
-  var minSV = null
-  try {
-    var rangeObj = new Range(range, options)
-  } catch (er) {
-    return null
-  }
-  versions.forEach(function (v) {
-    if (rangeObj.test(v)) {
-      // satisfies(v, range, options)
-      if (!min || minSV.compare(v) === 1) {
-        // compare(min, v, true)
-        min = v
-        minSV = new SemVer(min, options)
-      }
-    }
-  })
-  return min
-}
-
-exports.minVersion = minVersion
-function minVersion (range, loose) {
-  range = new Range(range, loose)
-
-  var minver = new SemVer('0.0.0')
-  if (range.test(minver)) {
-    return minver
-  }
-
-  minver = new SemVer('0.0.0-0')
-  if (range.test(minver)) {
-    return minver
-  }
-
-  minver = null
-  for (var i = 0; i < range.set.length; ++i) {
-    var comparators = range.set[i]
-
-    comparators.forEach(function (comparator) {
-      // Clone to avoid manipulating the comparator's semver object.
-      var compver = new SemVer(comparator.semver.version)
-      switch (comparator.operator) {
-        case '>':
-          if (compver.prerelease.length === 0) {
-            compver.patch++
-          } else {
-            compver.prerelease.push(0)
-          }
-          compver.raw = compver.format()
-          /* fallthrough */
-        case '':
-        case '>=':
-          if (!minver || gt(minver, compver)) {
-            minver = compver
-          }
-          break
-        case '<':
-        case '<=':
-          /* Ignore maximum versions */
-          break
-        /* istanbul ignore next */
-        default:
-          throw new Error('Unexpected operation: ' + comparator.operator)
-      }
-    })
-  }
-
-  if (minver && range.test(minver)) {
-    return minver
-  }
-
-  return null
-}
-
-exports.validRange = validRange
-function validRange (range, options) {
-  try {
-    // Return '*' instead of '' so that truthiness works.
-    // This will throw if it's invalid anyway
-    return new Range(range, options).range || '*'
-  } catch (er) {
-    return null
-  }
-}
-
-// Determine if version is less than all the versions possible in the range
-exports.ltr = ltr
-function ltr (version, range, options) {
-  return outside(version, range, '<', options)
-}
-
-// Determine if version is greater than all the versions possible in the range.
-exports.gtr = gtr
-function gtr (version, range, options) {
-  return outside(version, range, '>', options)
-}
-
-exports.outside = outside
-function outside (version, range, hilo, options) {
-  version = new SemVer(version, options)
-  range = new Range(range, options)
-
-  var gtfn, ltefn, ltfn, comp, ecomp
-  switch (hilo) {
-    case '>':
-      gtfn = gt
-      ltefn = lte
-      ltfn = lt
-      comp = '>'
-      ecomp = '>='
-      break
-    case '<':
-      gtfn = lt
-      ltefn = gte
-      ltfn = gt
-      comp = '<'
-      ecomp = '<='
-      break
-    default:
-      throw new TypeError('Must provide a hilo val of "<" or ">"')
-  }
-
-  // If it satisifes the range it is not outside
-  if (satisfies(version, range, options)) {
-    return false
-  }
-
-  // From now on, variable terms are as if we're in "gtr" mode.
-  // but note that everything is flipped for the "ltr" function.
-
-  for (var i = 0; i < range.set.length; ++i) {
-    var comparators = range.set[i]
-
-    var high = null
-    var low = null
-
-    comparators.forEach(function (comparator) {
-      if (comparator.semver === ANY) {
-        comparator = new Comparator('>=0.0.0')
-      }
-      high = high || comparator
-      low = low || comparator
-      if (gtfn(comparator.semver, high.semver, options)) {
-        high = comparator
-      } else if (ltfn(comparator.semver, low.semver, options)) {
-        low = comparator
-      }
-    })
-
-    // If the edge version comparator has a operator then our version
-    // isn't outside it
-    if (high.operator === comp || high.operator === ecomp) {
-      return false
-    }
-
-    // If the lowest version comparator has an operator and our version
-    // is less than it then it isn't higher than the range
-    if ((!low.operator || low.operator === comp) &&
-        ltefn(version, low.semver)) {
-      return false
-    } else if (low.operator === ecomp && ltfn(version, low.semver)) {
-      return false
-    }
-  }
-  return true
-}
-
-exports.prerelease = prerelease
-function prerelease (version, options) {
-  var parsed = parse(version, options)
-  return (parsed && parsed.prerelease.length) ? parsed.prerelease : null
-}
-
-exports.intersects = intersects
-function intersects (r1, r2, options) {
-  r1 = new Range(r1, options)
-  r2 = new Range(r2, options)
-  return r1.intersects(r2)
-}
-
-exports.coerce = coerce
-function coerce (version, options) {
-  if (version instanceof SemVer) {
-    return version
-  }
-
-  if (typeof version === 'number') {
-    version = String(version)
-  }
-
-  if (typeof version !== 'string') {
-    return null
-  }
-
-  options = options || {}
-
-  var match = null
-  if (!options.rtl) {
-    match = version.match(safeRe[t.COERCE])
-  } else {
-    // Find the right-most coercible string that does not share
-    // a terminus with a more left-ward coercible string.
-    // Eg, '1.2.3.4' wants to coerce '2.3.4', not '3.4' or '4'
-    //
-    // Walk through the string checking with a /g regexp
-    // Manually set the index so as to pick up overlapping matches.
-    // Stop when we get a match that ends at the string end, since no
-    // coercible string can be more right-ward without the same terminus.
-    var next
-    while ((next = safeRe[t.COERCERTL].exec(version)) &&
-      (!match || match.index + match[0].length !== version.length)
-    ) {
-      if (!match ||
-          next.index + next[0].length !== match.index + match[0].length) {
-        match = next
-      }
-      safeRe[t.COERCERTL].lastIndex = next.index + next[1].length + next[2].length
-    }
-    // leave it in a clean state
-    safeRe[t.COERCERTL].lastIndex = -1
-  }
-
-  if (match === null) {
-    return null
-  }
-
-  return parse(match[2] +
-    '.' + (match[3] || '0') +
-    '.' + (match[4] || '0'), options)
-}
-
 
 /***/ }),
 
@@ -8869,7 +6057,7 @@ const os = __importStar(__nccwpck_require__(2037));
 const path = __importStar(__nccwpck_require__(1017));
 const pathHelper = __importStar(__nccwpck_require__(5372));
 const assert_1 = __importDefault(__nccwpck_require__(9491));
-const minimatch_1 = __nccwpck_require__(3395);
+const minimatch_1 = __nccwpck_require__(9566);
 const internal_match_kind_1 = __nccwpck_require__(1631);
 const internal_path_1 = __nccwpck_require__(826);
 const IS_WINDOWS = process.platform === 'win32';
@@ -9113,1168 +6301,6 @@ class SearchState {
 }
 exports.SearchState = SearchState;
 //# sourceMappingURL=internal-search-state.js.map
-
-/***/ }),
-
-/***/ 7934:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-var concatMap = __nccwpck_require__(4527);
-var balanced = __nccwpck_require__(3353);
-
-module.exports = expandTop;
-
-var escSlash = '\0SLASH'+Math.random()+'\0';
-var escOpen = '\0OPEN'+Math.random()+'\0';
-var escClose = '\0CLOSE'+Math.random()+'\0';
-var escComma = '\0COMMA'+Math.random()+'\0';
-var escPeriod = '\0PERIOD'+Math.random()+'\0';
-
-function numeric(str) {
-  return parseInt(str, 10) == str
-    ? parseInt(str, 10)
-    : str.charCodeAt(0);
-}
-
-function escapeBraces(str) {
-  return str.split('\\\\').join(escSlash)
-            .split('\\{').join(escOpen)
-            .split('\\}').join(escClose)
-            .split('\\,').join(escComma)
-            .split('\\.').join(escPeriod);
-}
-
-function unescapeBraces(str) {
-  return str.split(escSlash).join('\\')
-            .split(escOpen).join('{')
-            .split(escClose).join('}')
-            .split(escComma).join(',')
-            .split(escPeriod).join('.');
-}
-
-
-// Basically just str.split(","), but handling cases
-// where we have nested braced sections, which should be
-// treated as individual members, like {a,{b,c},d}
-function parseCommaParts(str) {
-  if (!str)
-    return [''];
-
-  var parts = [];
-  var m = balanced('{', '}', str);
-
-  if (!m)
-    return str.split(',');
-
-  var pre = m.pre;
-  var body = m.body;
-  var post = m.post;
-  var p = pre.split(',');
-
-  p[p.length-1] += '{' + body + '}';
-  var postParts = parseCommaParts(post);
-  if (post.length) {
-    p[p.length-1] += postParts.shift();
-    p.push.apply(p, postParts);
-  }
-
-  parts.push.apply(parts, p);
-
-  return parts;
-}
-
-function expandTop(str) {
-  if (!str)
-    return [];
-
-  // I don't know why Bash 4.3 does this, but it does.
-  // Anything starting with {} will have the first two bytes preserved
-  // but *only* at the top level, so {},a}b will not expand to anything,
-  // but a{},b}c will be expanded to [a}c,abc].
-  // One could argue that this is a bug in Bash, but since the goal of
-  // this module is to match Bash's rules, we escape a leading {}
-  if (str.substr(0, 2) === '{}') {
-    str = '\\{\\}' + str.substr(2);
-  }
-
-  return expand(escapeBraces(str), true).map(unescapeBraces);
-}
-
-function identity(e) {
-  return e;
-}
-
-function embrace(str) {
-  return '{' + str + '}';
-}
-function isPadded(el) {
-  return /^-?0\d/.test(el);
-}
-
-function lte(i, y) {
-  return i <= y;
-}
-function gte(i, y) {
-  return i >= y;
-}
-
-function expand(str, isTop) {
-  var expansions = [];
-
-  var m = balanced('{', '}', str);
-  if (!m || /\$$/.test(m.pre)) return [str];
-
-  var isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body);
-  var isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body);
-  var isSequence = isNumericSequence || isAlphaSequence;
-  var isOptions = m.body.indexOf(',') >= 0;
-  if (!isSequence && !isOptions) {
-    // {a},b}
-    if (m.post.match(/,.*\}/)) {
-      str = m.pre + '{' + m.body + escClose + m.post;
-      return expand(str);
-    }
-    return [str];
-  }
-
-  var n;
-  if (isSequence) {
-    n = m.body.split(/\.\./);
-  } else {
-    n = parseCommaParts(m.body);
-    if (n.length === 1) {
-      // x{{a,b}}y ==> x{a}y x{b}y
-      n = expand(n[0], false).map(embrace);
-      if (n.length === 1) {
-        var post = m.post.length
-          ? expand(m.post, false)
-          : [''];
-        return post.map(function(p) {
-          return m.pre + n[0] + p;
-        });
-      }
-    }
-  }
-
-  // at this point, n is the parts, and we know it's not a comma set
-  // with a single entry.
-
-  // no need to expand pre, since it is guaranteed to be free of brace-sets
-  var pre = m.pre;
-  var post = m.post.length
-    ? expand(m.post, false)
-    : [''];
-
-  var N;
-
-  if (isSequence) {
-    var x = numeric(n[0]);
-    var y = numeric(n[1]);
-    var width = Math.max(n[0].length, n[1].length)
-    var incr = n.length == 3
-      ? Math.abs(numeric(n[2]))
-      : 1;
-    var test = lte;
-    var reverse = y < x;
-    if (reverse) {
-      incr *= -1;
-      test = gte;
-    }
-    var pad = n.some(isPadded);
-
-    N = [];
-
-    for (var i = x; test(i, y); i += incr) {
-      var c;
-      if (isAlphaSequence) {
-        c = String.fromCharCode(i);
-        if (c === '\\')
-          c = '';
-      } else {
-        c = String(i);
-        if (pad) {
-          var need = width - c.length;
-          if (need > 0) {
-            var z = new Array(need + 1).join('0');
-            if (i < 0)
-              c = '-' + z + c.slice(1);
-            else
-              c = z + c;
-          }
-        }
-      }
-      N.push(c);
-    }
-  } else {
-    N = concatMap(n, function(el) { return expand(el, false) });
-  }
-
-  for (var j = 0; j < N.length; j++) {
-    for (var k = 0; k < post.length; k++) {
-      var expansion = pre + N[j] + post[k];
-      if (!isTop || isSequence || expansion)
-        expansions.push(expansion);
-    }
-  }
-
-  return expansions;
-}
-
-
-
-/***/ }),
-
-/***/ 3395:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-module.exports = minimatch
-minimatch.Minimatch = Minimatch
-
-var path = (function () { try { return __nccwpck_require__(1017) } catch (e) {}}()) || {
-  sep: '/'
-}
-minimatch.sep = path.sep
-
-var GLOBSTAR = minimatch.GLOBSTAR = Minimatch.GLOBSTAR = {}
-var expand = __nccwpck_require__(7934)
-
-var plTypes = {
-  '!': { open: '(?:(?!(?:', close: '))[^/]*?)'},
-  '?': { open: '(?:', close: ')?' },
-  '+': { open: '(?:', close: ')+' },
-  '*': { open: '(?:', close: ')*' },
-  '@': { open: '(?:', close: ')' }
-}
-
-// any single thing other than /
-// don't need to escape / when using new RegExp()
-var qmark = '[^/]'
-
-// * => any number of characters
-var star = qmark + '*?'
-
-// ** when dots are allowed.  Anything goes, except .. and .
-// not (^ or / followed by one or two dots followed by $ or /),
-// followed by anything, any number of times.
-var twoStarDot = '(?:(?!(?:\\\/|^)(?:\\.{1,2})($|\\\/)).)*?'
-
-// not a ^ or / followed by a dot,
-// followed by anything, any number of times.
-var twoStarNoDot = '(?:(?!(?:\\\/|^)\\.).)*?'
-
-// characters that need to be escaped in RegExp.
-var reSpecials = charSet('().*{}+?[]^$\\!')
-
-// "abc" -> { a:true, b:true, c:true }
-function charSet (s) {
-  return s.split('').reduce(function (set, c) {
-    set[c] = true
-    return set
-  }, {})
-}
-
-// normalizes slashes.
-var slashSplit = /\/+/
-
-minimatch.filter = filter
-function filter (pattern, options) {
-  options = options || {}
-  return function (p, i, list) {
-    return minimatch(p, pattern, options)
-  }
-}
-
-function ext (a, b) {
-  b = b || {}
-  var t = {}
-  Object.keys(a).forEach(function (k) {
-    t[k] = a[k]
-  })
-  Object.keys(b).forEach(function (k) {
-    t[k] = b[k]
-  })
-  return t
-}
-
-minimatch.defaults = function (def) {
-  if (!def || typeof def !== 'object' || !Object.keys(def).length) {
-    return minimatch
-  }
-
-  var orig = minimatch
-
-  var m = function minimatch (p, pattern, options) {
-    return orig(p, pattern, ext(def, options))
-  }
-
-  m.Minimatch = function Minimatch (pattern, options) {
-    return new orig.Minimatch(pattern, ext(def, options))
-  }
-  m.Minimatch.defaults = function defaults (options) {
-    return orig.defaults(ext(def, options)).Minimatch
-  }
-
-  m.filter = function filter (pattern, options) {
-    return orig.filter(pattern, ext(def, options))
-  }
-
-  m.defaults = function defaults (options) {
-    return orig.defaults(ext(def, options))
-  }
-
-  m.makeRe = function makeRe (pattern, options) {
-    return orig.makeRe(pattern, ext(def, options))
-  }
-
-  m.braceExpand = function braceExpand (pattern, options) {
-    return orig.braceExpand(pattern, ext(def, options))
-  }
-
-  m.match = function (list, pattern, options) {
-    return orig.match(list, pattern, ext(def, options))
-  }
-
-  return m
-}
-
-Minimatch.defaults = function (def) {
-  return minimatch.defaults(def).Minimatch
-}
-
-function minimatch (p, pattern, options) {
-  assertValidPattern(pattern)
-
-  if (!options) options = {}
-
-  // shortcut: comments match nothing.
-  if (!options.nocomment && pattern.charAt(0) === '#') {
-    return false
-  }
-
-  return new Minimatch(pattern, options).match(p)
-}
-
-function Minimatch (pattern, options) {
-  if (!(this instanceof Minimatch)) {
-    return new Minimatch(pattern, options)
-  }
-
-  assertValidPattern(pattern)
-
-  if (!options) options = {}
-
-  pattern = pattern.trim()
-
-  // windows support: need to use /, not \
-  if (!options.allowWindowsEscape && path.sep !== '/') {
-    pattern = pattern.split(path.sep).join('/')
-  }
-
-  this.options = options
-  this.set = []
-  this.pattern = pattern
-  this.regexp = null
-  this.negate = false
-  this.comment = false
-  this.empty = false
-  this.partial = !!options.partial
-
-  // make the set of regexps etc.
-  this.make()
-}
-
-Minimatch.prototype.debug = function () {}
-
-Minimatch.prototype.make = make
-function make () {
-  var pattern = this.pattern
-  var options = this.options
-
-  // empty patterns and comments match nothing.
-  if (!options.nocomment && pattern.charAt(0) === '#') {
-    this.comment = true
-    return
-  }
-  if (!pattern) {
-    this.empty = true
-    return
-  }
-
-  // step 1: figure out negation, etc.
-  this.parseNegate()
-
-  // step 2: expand braces
-  var set = this.globSet = this.braceExpand()
-
-  if (options.debug) this.debug = function debug() { console.error.apply(console, arguments) }
-
-  this.debug(this.pattern, set)
-
-  // step 3: now we have a set, so turn each one into a series of path-portion
-  // matching patterns.
-  // These will be regexps, except in the case of "**", which is
-  // set to the GLOBSTAR object for globstar behavior,
-  // and will not contain any / characters
-  set = this.globParts = set.map(function (s) {
-    return s.split(slashSplit)
-  })
-
-  this.debug(this.pattern, set)
-
-  // glob --> regexps
-  set = set.map(function (s, si, set) {
-    return s.map(this.parse, this)
-  }, this)
-
-  this.debug(this.pattern, set)
-
-  // filter out everything that didn't compile properly.
-  set = set.filter(function (s) {
-    return s.indexOf(false) === -1
-  })
-
-  this.debug(this.pattern, set)
-
-  this.set = set
-}
-
-Minimatch.prototype.parseNegate = parseNegate
-function parseNegate () {
-  var pattern = this.pattern
-  var negate = false
-  var options = this.options
-  var negateOffset = 0
-
-  if (options.nonegate) return
-
-  for (var i = 0, l = pattern.length
-    ; i < l && pattern.charAt(i) === '!'
-    ; i++) {
-    negate = !negate
-    negateOffset++
-  }
-
-  if (negateOffset) this.pattern = pattern.substr(negateOffset)
-  this.negate = negate
-}
-
-// Brace expansion:
-// a{b,c}d -> abd acd
-// a{b,}c -> abc ac
-// a{0..3}d -> a0d a1d a2d a3d
-// a{b,c{d,e}f}g -> abg acdfg acefg
-// a{b,c}d{e,f}g -> abdeg acdeg abdeg abdfg
-//
-// Invalid sets are not expanded.
-// a{2..}b -> a{2..}b
-// a{b}c -> a{b}c
-minimatch.braceExpand = function (pattern, options) {
-  return braceExpand(pattern, options)
-}
-
-Minimatch.prototype.braceExpand = braceExpand
-
-function braceExpand (pattern, options) {
-  if (!options) {
-    if (this instanceof Minimatch) {
-      options = this.options
-    } else {
-      options = {}
-    }
-  }
-
-  pattern = typeof pattern === 'undefined'
-    ? this.pattern : pattern
-
-  assertValidPattern(pattern)
-
-  // Thanks to Yeting Li <https://github.com/yetingli> for
-  // improving this regexp to avoid a ReDOS vulnerability.
-  if (options.nobrace || !/\{(?:(?!\{).)*\}/.test(pattern)) {
-    // shortcut. no need to expand.
-    return [pattern]
-  }
-
-  return expand(pattern)
-}
-
-var MAX_PATTERN_LENGTH = 1024 * 64
-var assertValidPattern = function (pattern) {
-  if (typeof pattern !== 'string') {
-    throw new TypeError('invalid pattern')
-  }
-
-  if (pattern.length > MAX_PATTERN_LENGTH) {
-    throw new TypeError('pattern is too long')
-  }
-}
-
-// parse a component of the expanded set.
-// At this point, no pattern may contain "/" in it
-// so we're going to return a 2d array, where each entry is the full
-// pattern, split on '/', and then turned into a regular expression.
-// A regexp is made at the end which joins each array with an
-// escaped /, and another full one which joins each regexp with |.
-//
-// Following the lead of Bash 4.1, note that "**" only has special meaning
-// when it is the *only* thing in a path portion.  Otherwise, any series
-// of * is equivalent to a single *.  Globstar behavior is enabled by
-// default, and can be disabled by setting options.noglobstar.
-Minimatch.prototype.parse = parse
-var SUBPARSE = {}
-function parse (pattern, isSub) {
-  assertValidPattern(pattern)
-
-  var options = this.options
-
-  // shortcuts
-  if (pattern === '**') {
-    if (!options.noglobstar)
-      return GLOBSTAR
-    else
-      pattern = '*'
-  }
-  if (pattern === '') return ''
-
-  var re = ''
-  var hasMagic = !!options.nocase
-  var escaping = false
-  // ? => one single character
-  var patternListStack = []
-  var negativeLists = []
-  var stateChar
-  var inClass = false
-  var reClassStart = -1
-  var classStart = -1
-  // . and .. never match anything that doesn't start with .,
-  // even when options.dot is set.
-  var patternStart = pattern.charAt(0) === '.' ? '' // anything
-  // not (start or / followed by . or .. followed by / or end)
-  : options.dot ? '(?!(?:^|\\\/)\\.{1,2}(?:$|\\\/))'
-  : '(?!\\.)'
-  var self = this
-
-  function clearStateChar () {
-    if (stateChar) {
-      // we had some state-tracking character
-      // that wasn't consumed by this pass.
-      switch (stateChar) {
-        case '*':
-          re += star
-          hasMagic = true
-        break
-        case '?':
-          re += qmark
-          hasMagic = true
-        break
-        default:
-          re += '\\' + stateChar
-        break
-      }
-      self.debug('clearStateChar %j %j', stateChar, re)
-      stateChar = false
-    }
-  }
-
-  for (var i = 0, len = pattern.length, c
-    ; (i < len) && (c = pattern.charAt(i))
-    ; i++) {
-    this.debug('%s\t%s %s %j', pattern, i, re, c)
-
-    // skip over any that are escaped.
-    if (escaping && reSpecials[c]) {
-      re += '\\' + c
-      escaping = false
-      continue
-    }
-
-    switch (c) {
-      /* istanbul ignore next */
-      case '/': {
-        // completely not allowed, even escaped.
-        // Should already be path-split by now.
-        return false
-      }
-
-      case '\\':
-        clearStateChar()
-        escaping = true
-      continue
-
-      // the various stateChar values
-      // for the "extglob" stuff.
-      case '?':
-      case '*':
-      case '+':
-      case '@':
-      case '!':
-        this.debug('%s\t%s %s %j <-- stateChar', pattern, i, re, c)
-
-        // all of those are literals inside a class, except that
-        // the glob [!a] means [^a] in regexp
-        if (inClass) {
-          this.debug('  in class')
-          if (c === '!' && i === classStart + 1) c = '^'
-          re += c
-          continue
-        }
-
-        // if we already have a stateChar, then it means
-        // that there was something like ** or +? in there.
-        // Handle the stateChar, then proceed with this one.
-        self.debug('call clearStateChar %j', stateChar)
-        clearStateChar()
-        stateChar = c
-        // if extglob is disabled, then +(asdf|foo) isn't a thing.
-        // just clear the statechar *now*, rather than even diving into
-        // the patternList stuff.
-        if (options.noext) clearStateChar()
-      continue
-
-      case '(':
-        if (inClass) {
-          re += '('
-          continue
-        }
-
-        if (!stateChar) {
-          re += '\\('
-          continue
-        }
-
-        patternListStack.push({
-          type: stateChar,
-          start: i - 1,
-          reStart: re.length,
-          open: plTypes[stateChar].open,
-          close: plTypes[stateChar].close
-        })
-        // negation is (?:(?!js)[^/]*)
-        re += stateChar === '!' ? '(?:(?!(?:' : '(?:'
-        this.debug('plType %j %j', stateChar, re)
-        stateChar = false
-      continue
-
-      case ')':
-        if (inClass || !patternListStack.length) {
-          re += '\\)'
-          continue
-        }
-
-        clearStateChar()
-        hasMagic = true
-        var pl = patternListStack.pop()
-        // negation is (?:(?!js)[^/]*)
-        // The others are (?:<pattern>)<type>
-        re += pl.close
-        if (pl.type === '!') {
-          negativeLists.push(pl)
-        }
-        pl.reEnd = re.length
-      continue
-
-      case '|':
-        if (inClass || !patternListStack.length || escaping) {
-          re += '\\|'
-          escaping = false
-          continue
-        }
-
-        clearStateChar()
-        re += '|'
-      continue
-
-      // these are mostly the same in regexp and glob
-      case '[':
-        // swallow any state-tracking char before the [
-        clearStateChar()
-
-        if (inClass) {
-          re += '\\' + c
-          continue
-        }
-
-        inClass = true
-        classStart = i
-        reClassStart = re.length
-        re += c
-      continue
-
-      case ']':
-        //  a right bracket shall lose its special
-        //  meaning and represent itself in
-        //  a bracket expression if it occurs
-        //  first in the list.  -- POSIX.2 2.8.3.2
-        if (i === classStart + 1 || !inClass) {
-          re += '\\' + c
-          escaping = false
-          continue
-        }
-
-        // handle the case where we left a class open.
-        // "[z-a]" is valid, equivalent to "\[z-a\]"
-        // split where the last [ was, make sure we don't have
-        // an invalid re. if so, re-walk the contents of the
-        // would-be class to re-translate any characters that
-        // were passed through as-is
-        // TODO: It would probably be faster to determine this
-        // without a try/catch and a new RegExp, but it's tricky
-        // to do safely.  For now, this is safe and works.
-        var cs = pattern.substring(classStart + 1, i)
-        try {
-          RegExp('[' + cs + ']')
-        } catch (er) {
-          // not a valid class!
-          var sp = this.parse(cs, SUBPARSE)
-          re = re.substr(0, reClassStart) + '\\[' + sp[0] + '\\]'
-          hasMagic = hasMagic || sp[1]
-          inClass = false
-          continue
-        }
-
-        // finish up the class.
-        hasMagic = true
-        inClass = false
-        re += c
-      continue
-
-      default:
-        // swallow any state char that wasn't consumed
-        clearStateChar()
-
-        if (escaping) {
-          // no need
-          escaping = false
-        } else if (reSpecials[c]
-          && !(c === '^' && inClass)) {
-          re += '\\'
-        }
-
-        re += c
-
-    } // switch
-  } // for
-
-  // handle the case where we left a class open.
-  // "[abc" is valid, equivalent to "\[abc"
-  if (inClass) {
-    // split where the last [ was, and escape it
-    // this is a huge pita.  We now have to re-walk
-    // the contents of the would-be class to re-translate
-    // any characters that were passed through as-is
-    cs = pattern.substr(classStart + 1)
-    sp = this.parse(cs, SUBPARSE)
-    re = re.substr(0, reClassStart) + '\\[' + sp[0]
-    hasMagic = hasMagic || sp[1]
-  }
-
-  // handle the case where we had a +( thing at the *end*
-  // of the pattern.
-  // each pattern list stack adds 3 chars, and we need to go through
-  // and escape any | chars that were passed through as-is for the regexp.
-  // Go through and escape them, taking care not to double-escape any
-  // | chars that were already escaped.
-  for (pl = patternListStack.pop(); pl; pl = patternListStack.pop()) {
-    var tail = re.slice(pl.reStart + pl.open.length)
-    this.debug('setting tail', re, pl)
-    // maybe some even number of \, then maybe 1 \, followed by a |
-    tail = tail.replace(/((?:\\{2}){0,64})(\\?)\|/g, function (_, $1, $2) {
-      if (!$2) {
-        // the | isn't already escaped, so escape it.
-        $2 = '\\'
-      }
-
-      // need to escape all those slashes *again*, without escaping the
-      // one that we need for escaping the | character.  As it works out,
-      // escaping an even number of slashes can be done by simply repeating
-      // it exactly after itself.  That's why this trick works.
-      //
-      // I am sorry that you have to see this.
-      return $1 + $1 + $2 + '|'
-    })
-
-    this.debug('tail=%j\n   %s', tail, tail, pl, re)
-    var t = pl.type === '*' ? star
-      : pl.type === '?' ? qmark
-      : '\\' + pl.type
-
-    hasMagic = true
-    re = re.slice(0, pl.reStart) + t + '\\(' + tail
-  }
-
-  // handle trailing things that only matter at the very end.
-  clearStateChar()
-  if (escaping) {
-    // trailing \\
-    re += '\\\\'
-  }
-
-  // only need to apply the nodot start if the re starts with
-  // something that could conceivably capture a dot
-  var addPatternStart = false
-  switch (re.charAt(0)) {
-    case '[': case '.': case '(': addPatternStart = true
-  }
-
-  // Hack to work around lack of negative lookbehind in JS
-  // A pattern like: *.!(x).!(y|z) needs to ensure that a name
-  // like 'a.xyz.yz' doesn't match.  So, the first negative
-  // lookahead, has to look ALL the way ahead, to the end of
-  // the pattern.
-  for (var n = negativeLists.length - 1; n > -1; n--) {
-    var nl = negativeLists[n]
-
-    var nlBefore = re.slice(0, nl.reStart)
-    var nlFirst = re.slice(nl.reStart, nl.reEnd - 8)
-    var nlLast = re.slice(nl.reEnd - 8, nl.reEnd)
-    var nlAfter = re.slice(nl.reEnd)
-
-    nlLast += nlAfter
-
-    // Handle nested stuff like *(*.js|!(*.json)), where open parens
-    // mean that we should *not* include the ) in the bit that is considered
-    // "after" the negated section.
-    var openParensBefore = nlBefore.split('(').length - 1
-    var cleanAfter = nlAfter
-    for (i = 0; i < openParensBefore; i++) {
-      cleanAfter = cleanAfter.replace(/\)[+*?]?/, '')
-    }
-    nlAfter = cleanAfter
-
-    var dollar = ''
-    if (nlAfter === '' && isSub !== SUBPARSE) {
-      dollar = '$'
-    }
-    var newRe = nlBefore + nlFirst + nlAfter + dollar + nlLast
-    re = newRe
-  }
-
-  // if the re is not "" at this point, then we need to make sure
-  // it doesn't match against an empty path part.
-  // Otherwise a/* will match a/, which it should not.
-  if (re !== '' && hasMagic) {
-    re = '(?=.)' + re
-  }
-
-  if (addPatternStart) {
-    re = patternStart + re
-  }
-
-  // parsing just a piece of a larger pattern.
-  if (isSub === SUBPARSE) {
-    return [re, hasMagic]
-  }
-
-  // skip the regexp for non-magical patterns
-  // unescape anything in it, though, so that it'll be
-  // an exact match against a file etc.
-  if (!hasMagic) {
-    return globUnescape(pattern)
-  }
-
-  var flags = options.nocase ? 'i' : ''
-  try {
-    var regExp = new RegExp('^' + re + '$', flags)
-  } catch (er) /* istanbul ignore next - should be impossible */ {
-    // If it was an invalid regular expression, then it can't match
-    // anything.  This trick looks for a character after the end of
-    // the string, which is of course impossible, except in multi-line
-    // mode, but it's not a /m regex.
-    return new RegExp('$.')
-  }
-
-  regExp._glob = pattern
-  regExp._src = re
-
-  return regExp
-}
-
-minimatch.makeRe = function (pattern, options) {
-  return new Minimatch(pattern, options || {}).makeRe()
-}
-
-Minimatch.prototype.makeRe = makeRe
-function makeRe () {
-  if (this.regexp || this.regexp === false) return this.regexp
-
-  // at this point, this.set is a 2d array of partial
-  // pattern strings, or "**".
-  //
-  // It's better to use .match().  This function shouldn't
-  // be used, really, but it's pretty convenient sometimes,
-  // when you just want to work with a regex.
-  var set = this.set
-
-  if (!set.length) {
-    this.regexp = false
-    return this.regexp
-  }
-  var options = this.options
-
-  var twoStar = options.noglobstar ? star
-    : options.dot ? twoStarDot
-    : twoStarNoDot
-  var flags = options.nocase ? 'i' : ''
-
-  var re = set.map(function (pattern) {
-    return pattern.map(function (p) {
-      return (p === GLOBSTAR) ? twoStar
-      : (typeof p === 'string') ? regExpEscape(p)
-      : p._src
-    }).join('\\\/')
-  }).join('|')
-
-  // must match entire pattern
-  // ending in a * or ** will make it less strict.
-  re = '^(?:' + re + ')$'
-
-  // can match anything, as long as it's not this.
-  if (this.negate) re = '^(?!' + re + ').*$'
-
-  try {
-    this.regexp = new RegExp(re, flags)
-  } catch (ex) /* istanbul ignore next - should be impossible */ {
-    this.regexp = false
-  }
-  return this.regexp
-}
-
-minimatch.match = function (list, pattern, options) {
-  options = options || {}
-  var mm = new Minimatch(pattern, options)
-  list = list.filter(function (f) {
-    return mm.match(f)
-  })
-  if (mm.options.nonull && !list.length) {
-    list.push(pattern)
-  }
-  return list
-}
-
-Minimatch.prototype.match = function match (f, partial) {
-  if (typeof partial === 'undefined') partial = this.partial
-  this.debug('match', f, this.pattern)
-  // short-circuit in the case of busted things.
-  // comments, etc.
-  if (this.comment) return false
-  if (this.empty) return f === ''
-
-  if (f === '/' && partial) return true
-
-  var options = this.options
-
-  // windows: need to use /, not \
-  if (path.sep !== '/') {
-    f = f.split(path.sep).join('/')
-  }
-
-  // treat the test path as a set of pathparts.
-  f = f.split(slashSplit)
-  this.debug(this.pattern, 'split', f)
-
-  // just ONE of the pattern sets in this.set needs to match
-  // in order for it to be valid.  If negating, then just one
-  // match means that we have failed.
-  // Either way, return on the first hit.
-
-  var set = this.set
-  this.debug(this.pattern, 'set', set)
-
-  // Find the basename of the path by looking for the last non-empty segment
-  var filename
-  var i
-  for (i = f.length - 1; i >= 0; i--) {
-    filename = f[i]
-    if (filename) break
-  }
-
-  for (i = 0; i < set.length; i++) {
-    var pattern = set[i]
-    var file = f
-    if (options.matchBase && pattern.length === 1) {
-      file = [filename]
-    }
-    var hit = this.matchOne(file, pattern, partial)
-    if (hit) {
-      if (options.flipNegate) return true
-      return !this.negate
-    }
-  }
-
-  // didn't get any hits.  this is success if it's a negative
-  // pattern, failure otherwise.
-  if (options.flipNegate) return false
-  return this.negate
-}
-
-// set partial to true to test if, for example,
-// "/a/b" matches the start of "/*/b/*/d"
-// Partial means, if you run out of file before you run
-// out of pattern, then that's fine, as long as all
-// the parts match.
-Minimatch.prototype.matchOne = function (file, pattern, partial) {
-  var options = this.options
-
-  this.debug('matchOne',
-    { 'this': this, file: file, pattern: pattern })
-
-  this.debug('matchOne', file.length, pattern.length)
-
-  for (var fi = 0,
-      pi = 0,
-      fl = file.length,
-      pl = pattern.length
-      ; (fi < fl) && (pi < pl)
-      ; fi++, pi++) {
-    this.debug('matchOne loop')
-    var p = pattern[pi]
-    var f = file[fi]
-
-    this.debug(pattern, p, f)
-
-    // should be impossible.
-    // some invalid regexp stuff in the set.
-    /* istanbul ignore if */
-    if (p === false) return false
-
-    if (p === GLOBSTAR) {
-      this.debug('GLOBSTAR', [pattern, p, f])
-
-      // "**"
-      // a/**/b/**/c would match the following:
-      // a/b/x/y/z/c
-      // a/x/y/z/b/c
-      // a/b/x/b/x/c
-      // a/b/c
-      // To do this, take the rest of the pattern after
-      // the **, and see if it would match the file remainder.
-      // If so, return success.
-      // If not, the ** "swallows" a segment, and try again.
-      // This is recursively awful.
-      //
-      // a/**/b/**/c matching a/b/x/y/z/c
-      // - a matches a
-      // - doublestar
-      //   - matchOne(b/x/y/z/c, b/**/c)
-      //     - b matches b
-      //     - doublestar
-      //       - matchOne(x/y/z/c, c) -> no
-      //       - matchOne(y/z/c, c) -> no
-      //       - matchOne(z/c, c) -> no
-      //       - matchOne(c, c) yes, hit
-      var fr = fi
-      var pr = pi + 1
-      if (pr === pl) {
-        this.debug('** at the end')
-        // a ** at the end will just swallow the rest.
-        // We have found a match.
-        // however, it will not swallow /.x, unless
-        // options.dot is set.
-        // . and .. are *never* matched by **, for explosively
-        // exponential reasons.
-        for (; fi < fl; fi++) {
-          if (file[fi] === '.' || file[fi] === '..' ||
-            (!options.dot && file[fi].charAt(0) === '.')) return false
-        }
-        return true
-      }
-
-      // ok, let's see if we can swallow whatever we can.
-      while (fr < fl) {
-        var swallowee = file[fr]
-
-        this.debug('\nglobstar while', file, fr, pattern, pr, swallowee)
-
-        // XXX remove this slice.  Just pass the start index.
-        if (this.matchOne(file.slice(fr), pattern.slice(pr), partial)) {
-          this.debug('globstar found match!', fr, fl, swallowee)
-          // found a match.
-          return true
-        } else {
-          // can't swallow "." or ".." ever.
-          // can only swallow ".foo" when explicitly asked.
-          if (swallowee === '.' || swallowee === '..' ||
-            (!options.dot && swallowee.charAt(0) === '.')) {
-            this.debug('dot detected!', file, fr, pattern, pr)
-            break
-          }
-
-          // ** swallows a segment, and continue.
-          this.debug('globstar swallow a segment, and continue')
-          fr++
-        }
-      }
-
-      // no match was found.
-      // However, in partial mode, we can't say this is necessarily over.
-      // If there's more *pattern* left, then
-      /* istanbul ignore if */
-      if (partial) {
-        // ran out of file
-        this.debug('\n>>> no match, partial?', file, fr, pattern, pr)
-        if (fr === fl) return true
-      }
-      return false
-    }
-
-    // something other than **
-    // non-magic patterns just have to match exactly
-    // patterns with magic have been turned into regexps.
-    var hit
-    if (typeof p === 'string') {
-      hit = f === p
-      this.debug('string match', p, f, hit)
-    } else {
-      hit = f.match(p)
-      this.debug('pattern match', p, f, hit)
-    }
-
-    if (!hit) return false
-  }
-
-  // Note: ending in / means that we'll get a final ""
-  // at the end of the pattern.  This can only match a
-  // corresponding "" at the end of the file.
-  // If the file ends in /, then it can only match a
-  // a pattern that ends in /, unless the pattern just
-  // doesn't have any more for it. But, a/b/ should *not*
-  // match "a/b/*", even though "" matches against the
-  // [^/]*? pattern, except in partial mode, where it might
-  // simply not be reached yet.
-  // However, a/b/ should still satisfy a/*
-
-  // now either we fell off the end of the pattern, or we're done.
-  if (fi === fl && pi === pl) {
-    // ran out of pattern and filename at the same time.
-    // an exact hit!
-    return true
-  } else if (fi === fl) {
-    // ran out of file, but still had pattern left.
-    // this is ok if we're doing the match as part of
-    // a glob fs traversal.
-    return partial
-  } else /* istanbul ignore else */ if (pi === pl) {
-    // ran out of pattern, still have file left.
-    // this is only acceptable if we're on the very last
-    // empty segment of a file with a trailing slash.
-    // a/* should match a/b/
-    return (fi === fl - 1) && (file[fi] === '')
-  }
-
-  // should be unreachable.
-  /* istanbul ignore next */
-  throw new Error('wtf?')
-}
-
-// replace stuff like \* with *
-function globUnescape (s) {
-  return s.replace(/\\(.)/g, '$1')
-}
-
-function regExpEscape (s) {
-  return s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
-}
-
 
 /***/ }),
 
@@ -11857,206 +7883,6 @@ exports.AbortSignal = AbortSignal;
 
 /***/ }),
 
-/***/ 1150:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-
-var coreUtil = __nccwpck_require__(6959);
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * A static-key-based credential that supports updating
- * the underlying key value.
- */
-class AzureKeyCredential {
-    /**
-     * The value of the key to be used in authentication
-     */
-    get key() {
-        return this._key;
-    }
-    /**
-     * Create an instance of an AzureKeyCredential for use
-     * with a service client.
-     *
-     * @param key - The initial value of the key to use in authentication
-     */
-    constructor(key) {
-        if (!key) {
-            throw new Error("key must be a non-empty string");
-        }
-        this._key = key;
-    }
-    /**
-     * Change the value of the key.
-     *
-     * Updates will take effect upon the next request after
-     * updating the key value.
-     *
-     * @param newKey - The new key value to be used
-     */
-    update(newKey) {
-        this._key = newKey;
-    }
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * Tests an object to determine whether it implements KeyCredential.
- *
- * @param credential - The assumed KeyCredential to be tested.
- */
-function isKeyCredential(credential) {
-    return coreUtil.isObjectWithProperties(credential, ["key"]) && typeof credential.key === "string";
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * A static name/key-based credential that supports updating
- * the underlying name and key values.
- */
-class AzureNamedKeyCredential {
-    /**
-     * The value of the key to be used in authentication.
-     */
-    get key() {
-        return this._key;
-    }
-    /**
-     * The value of the name to be used in authentication.
-     */
-    get name() {
-        return this._name;
-    }
-    /**
-     * Create an instance of an AzureNamedKeyCredential for use
-     * with a service client.
-     *
-     * @param name - The initial value of the name to use in authentication.
-     * @param key - The initial value of the key to use in authentication.
-     */
-    constructor(name, key) {
-        if (!name || !key) {
-            throw new TypeError("name and key must be non-empty strings");
-        }
-        this._name = name;
-        this._key = key;
-    }
-    /**
-     * Change the value of the key.
-     *
-     * Updates will take effect upon the next request after
-     * updating the key value.
-     *
-     * @param newName - The new name value to be used.
-     * @param newKey - The new key value to be used.
-     */
-    update(newName, newKey) {
-        if (!newName || !newKey) {
-            throw new TypeError("newName and newKey must be non-empty strings");
-        }
-        this._name = newName;
-        this._key = newKey;
-    }
-}
-/**
- * Tests an object to determine whether it implements NamedKeyCredential.
- *
- * @param credential - The assumed NamedKeyCredential to be tested.
- */
-function isNamedKeyCredential(credential) {
-    return (coreUtil.isObjectWithProperties(credential, ["name", "key"]) &&
-        typeof credential.key === "string" &&
-        typeof credential.name === "string");
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * A static-signature-based credential that supports updating
- * the underlying signature value.
- */
-class AzureSASCredential {
-    /**
-     * The value of the shared access signature to be used in authentication
-     */
-    get signature() {
-        return this._signature;
-    }
-    /**
-     * Create an instance of an AzureSASCredential for use
-     * with a service client.
-     *
-     * @param signature - The initial value of the shared access signature to use in authentication
-     */
-    constructor(signature) {
-        if (!signature) {
-            throw new Error("shared access signature must be a non-empty string");
-        }
-        this._signature = signature;
-    }
-    /**
-     * Change the value of the signature.
-     *
-     * Updates will take effect upon the next request after
-     * updating the signature value.
-     *
-     * @param newSignature - The new shared access signature value to be used
-     */
-    update(newSignature) {
-        if (!newSignature) {
-            throw new Error("shared access signature must be a non-empty string");
-        }
-        this._signature = newSignature;
-    }
-}
-/**
- * Tests an object to determine whether it implements SASCredential.
- *
- * @param credential - The assumed SASCredential to be tested.
- */
-function isSASCredential(credential) {
-    return (coreUtil.isObjectWithProperties(credential, ["signature"]) && typeof credential.signature === "string");
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * Tests an object to determine whether it implements TokenCredential.
- *
- * @param credential - The assumed TokenCredential to be tested.
- */
-function isTokenCredential(credential) {
-    // Check for an object with a 'getToken' function and possibly with
-    // a 'signRequest' function.  We do this check to make sure that
-    // a ServiceClientCredentials implementor (like TokenClientCredentials
-    // in ms-rest-nodeauth) doesn't get mistaken for a TokenCredential if
-    // it doesn't actually implement TokenCredential also.
-    const castCredential = credential;
-    return (castCredential &&
-        typeof castCredential.getToken === "function" &&
-        (castCredential.signRequest === undefined || castCredential.getToken.length > 0));
-}
-
-exports.AzureKeyCredential = AzureKeyCredential;
-exports.AzureNamedKeyCredential = AzureNamedKeyCredential;
-exports.AzureSASCredential = AzureSASCredential;
-exports.isKeyCredential = isKeyCredential;
-exports.isNamedKeyCredential = isNamedKeyCredential;
-exports.isSASCredential = isSASCredential;
-exports.isTokenCredential = isTokenCredential;
-//# sourceMappingURL=index.js.map
-
-
-/***/ }),
-
 /***/ 5316:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -12069,9 +7895,9 @@ var uuid = __nccwpck_require__(3652);
 var util = __nccwpck_require__(3837);
 var tslib = __nccwpck_require__(36);
 var xml2js = __nccwpck_require__(7013);
-var coreUtil = __nccwpck_require__(6959);
-var logger$1 = __nccwpck_require__(4766);
-var coreAuth = __nccwpck_require__(1150);
+var coreUtil = __nccwpck_require__(7409);
+var logger$1 = __nccwpck_require__(865);
+var coreAuth = __nccwpck_require__(6411);
 var os = __nccwpck_require__(2037);
 var http = __nccwpck_require__(3685);
 var https = __nccwpck_require__(5687);
@@ -18701,1315 +14527,6 @@ exports["default"] = _default;
 
 /***/ }),
 
-/***/ 9845:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-
-var logger$1 = __nccwpck_require__(4766);
-var coreUtil = __nccwpck_require__(6959);
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * The `@azure/logger` configuration for this package.
- * @internal
- */
-const logger = logger$1.createClientLogger("core-lro");
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * The default time interval to wait before sending the next polling request.
- */
-const POLL_INTERVAL_IN_MS = 2000;
-/**
- * The closed set of terminal states.
- */
-const terminalStates = ["succeeded", "canceled", "failed"];
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * Deserializes the state
- */
-function deserializeState(serializedState) {
-    try {
-        return JSON.parse(serializedState).state;
-    }
-    catch (e) {
-        throw new Error(`Unable to deserialize input state: ${serializedState}`);
-    }
-}
-function setStateError(inputs) {
-    const { state, stateProxy, isOperationError } = inputs;
-    return (error) => {
-        if (isOperationError(error)) {
-            stateProxy.setError(state, error);
-            stateProxy.setFailed(state);
-        }
-        throw error;
-    };
-}
-function appendReadableErrorMessage(currentMessage, innerMessage) {
-    let message = currentMessage;
-    if (message.slice(-1) !== ".") {
-        message = message + ".";
-    }
-    return message + " " + innerMessage;
-}
-function simplifyError(err) {
-    let message = err.message;
-    let code = err.code;
-    let curErr = err;
-    while (curErr.innererror) {
-        curErr = curErr.innererror;
-        code = curErr.code;
-        message = appendReadableErrorMessage(message, curErr.message);
-    }
-    return {
-        code,
-        message,
-    };
-}
-function processOperationStatus(result) {
-    const { state, stateProxy, status, isDone, processResult, getError, response, setErrorAsResult } = result;
-    switch (status) {
-        case "succeeded": {
-            stateProxy.setSucceeded(state);
-            break;
-        }
-        case "failed": {
-            const err = getError === null || getError === void 0 ? void 0 : getError(response);
-            let postfix = "";
-            if (err) {
-                const { code, message } = simplifyError(err);
-                postfix = `. ${code}. ${message}`;
-            }
-            const errStr = `The long-running operation has failed${postfix}`;
-            stateProxy.setError(state, new Error(errStr));
-            stateProxy.setFailed(state);
-            logger.warning(errStr);
-            break;
-        }
-        case "canceled": {
-            stateProxy.setCanceled(state);
-            break;
-        }
-    }
-    if ((isDone === null || isDone === void 0 ? void 0 : isDone(response, state)) ||
-        (isDone === undefined &&
-            ["succeeded", "canceled"].concat(setErrorAsResult ? [] : ["failed"]).includes(status))) {
-        stateProxy.setResult(state, buildResult({
-            response,
-            state,
-            processResult,
-        }));
-    }
-}
-function buildResult(inputs) {
-    const { processResult, response, state } = inputs;
-    return processResult ? processResult(response, state) : response;
-}
-/**
- * Initiates the long-running operation.
- */
-async function initOperation(inputs) {
-    const { init, stateProxy, processResult, getOperationStatus, withOperationLocation, setErrorAsResult, } = inputs;
-    const { operationLocation, resourceLocation, metadata, response } = await init();
-    if (operationLocation)
-        withOperationLocation === null || withOperationLocation === void 0 ? void 0 : withOperationLocation(operationLocation, false);
-    const config = {
-        metadata,
-        operationLocation,
-        resourceLocation,
-    };
-    logger.verbose(`LRO: Operation description:`, config);
-    const state = stateProxy.initState(config);
-    const status = getOperationStatus({ response, state, operationLocation });
-    processOperationStatus({ state, status, stateProxy, response, setErrorAsResult, processResult });
-    return state;
-}
-async function pollOperationHelper(inputs) {
-    const { poll, state, stateProxy, operationLocation, getOperationStatus, getResourceLocation, isOperationError, options, } = inputs;
-    const response = await poll(operationLocation, options).catch(setStateError({
-        state,
-        stateProxy,
-        isOperationError,
-    }));
-    const status = getOperationStatus(response, state);
-    logger.verbose(`LRO: Status:\n\tPolling from: ${state.config.operationLocation}\n\tOperation status: ${status}\n\tPolling status: ${terminalStates.includes(status) ? "Stopped" : "Running"}`);
-    if (status === "succeeded") {
-        const resourceLocation = getResourceLocation(response, state);
-        if (resourceLocation !== undefined) {
-            return {
-                response: await poll(resourceLocation).catch(setStateError({ state, stateProxy, isOperationError })),
-                status,
-            };
-        }
-    }
-    return { response, status };
-}
-/** Polls the long-running operation. */
-async function pollOperation(inputs) {
-    const { poll, state, stateProxy, options, getOperationStatus, getResourceLocation, getOperationLocation, isOperationError, withOperationLocation, getPollingInterval, processResult, getError, updateState, setDelay, isDone, setErrorAsResult, } = inputs;
-    const { operationLocation } = state.config;
-    if (operationLocation !== undefined) {
-        const { response, status } = await pollOperationHelper({
-            poll,
-            getOperationStatus,
-            state,
-            stateProxy,
-            operationLocation,
-            getResourceLocation,
-            isOperationError,
-            options,
-        });
-        processOperationStatus({
-            status,
-            response,
-            state,
-            stateProxy,
-            isDone,
-            processResult,
-            getError,
-            setErrorAsResult,
-        });
-        if (!terminalStates.includes(status)) {
-            const intervalInMs = getPollingInterval === null || getPollingInterval === void 0 ? void 0 : getPollingInterval(response);
-            if (intervalInMs)
-                setDelay(intervalInMs);
-            const location = getOperationLocation === null || getOperationLocation === void 0 ? void 0 : getOperationLocation(response, state);
-            if (location !== undefined) {
-                const isUpdated = operationLocation !== location;
-                state.config.operationLocation = location;
-                withOperationLocation === null || withOperationLocation === void 0 ? void 0 : withOperationLocation(location, isUpdated);
-            }
-            else
-                withOperationLocation === null || withOperationLocation === void 0 ? void 0 : withOperationLocation(operationLocation, false);
-        }
-        updateState === null || updateState === void 0 ? void 0 : updateState(state, response);
-    }
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-function getOperationLocationPollingUrl(inputs) {
-    const { azureAsyncOperation, operationLocation } = inputs;
-    return operationLocation !== null && operationLocation !== void 0 ? operationLocation : azureAsyncOperation;
-}
-function getLocationHeader(rawResponse) {
-    return rawResponse.headers["location"];
-}
-function getOperationLocationHeader(rawResponse) {
-    return rawResponse.headers["operation-location"];
-}
-function getAzureAsyncOperationHeader(rawResponse) {
-    return rawResponse.headers["azure-asyncoperation"];
-}
-function findResourceLocation(inputs) {
-    var _a;
-    const { location, requestMethod, requestPath, resourceLocationConfig } = inputs;
-    switch (requestMethod) {
-        case "PUT": {
-            return requestPath;
-        }
-        case "DELETE": {
-            return undefined;
-        }
-        case "PATCH": {
-            return (_a = getDefault()) !== null && _a !== void 0 ? _a : requestPath;
-        }
-        default: {
-            return getDefault();
-        }
-    }
-    function getDefault() {
-        switch (resourceLocationConfig) {
-            case "azure-async-operation": {
-                return undefined;
-            }
-            case "original-uri": {
-                return requestPath;
-            }
-            case "location":
-            default: {
-                return location;
-            }
-        }
-    }
-}
-function inferLroMode(inputs) {
-    const { rawResponse, requestMethod, requestPath, resourceLocationConfig } = inputs;
-    const operationLocation = getOperationLocationHeader(rawResponse);
-    const azureAsyncOperation = getAzureAsyncOperationHeader(rawResponse);
-    const pollingUrl = getOperationLocationPollingUrl({ operationLocation, azureAsyncOperation });
-    const location = getLocationHeader(rawResponse);
-    const normalizedRequestMethod = requestMethod === null || requestMethod === void 0 ? void 0 : requestMethod.toLocaleUpperCase();
-    if (pollingUrl !== undefined) {
-        return {
-            mode: "OperationLocation",
-            operationLocation: pollingUrl,
-            resourceLocation: findResourceLocation({
-                requestMethod: normalizedRequestMethod,
-                location,
-                requestPath,
-                resourceLocationConfig,
-            }),
-        };
-    }
-    else if (location !== undefined) {
-        return {
-            mode: "ResourceLocation",
-            operationLocation: location,
-        };
-    }
-    else if (normalizedRequestMethod === "PUT" && requestPath) {
-        return {
-            mode: "Body",
-            operationLocation: requestPath,
-        };
-    }
-    else {
-        return undefined;
-    }
-}
-function transformStatus(inputs) {
-    const { status, statusCode } = inputs;
-    if (typeof status !== "string" && status !== undefined) {
-        throw new Error(`Polling was unsuccessful. Expected status to have a string value or no value but it has instead: ${status}. This doesn't necessarily indicate the operation has failed. Check your Azure subscription or resource status for more information.`);
-    }
-    switch (status === null || status === void 0 ? void 0 : status.toLocaleLowerCase()) {
-        case undefined:
-            return toOperationStatus(statusCode);
-        case "succeeded":
-            return "succeeded";
-        case "failed":
-            return "failed";
-        case "running":
-        case "accepted":
-        case "started":
-        case "canceling":
-        case "cancelling":
-            return "running";
-        case "canceled":
-        case "cancelled":
-            return "canceled";
-        default: {
-            logger.verbose(`LRO: unrecognized operation status: ${status}`);
-            return status;
-        }
-    }
-}
-function getStatus(rawResponse) {
-    var _a;
-    const { status } = (_a = rawResponse.body) !== null && _a !== void 0 ? _a : {};
-    return transformStatus({ status, statusCode: rawResponse.statusCode });
-}
-function getProvisioningState(rawResponse) {
-    var _a, _b;
-    const { properties, provisioningState } = (_a = rawResponse.body) !== null && _a !== void 0 ? _a : {};
-    const status = (_b = properties === null || properties === void 0 ? void 0 : properties.provisioningState) !== null && _b !== void 0 ? _b : provisioningState;
-    return transformStatus({ status, statusCode: rawResponse.statusCode });
-}
-function toOperationStatus(statusCode) {
-    if (statusCode === 202) {
-        return "running";
-    }
-    else if (statusCode < 300) {
-        return "succeeded";
-    }
-    else {
-        return "failed";
-    }
-}
-function parseRetryAfter({ rawResponse }) {
-    const retryAfter = rawResponse.headers["retry-after"];
-    if (retryAfter !== undefined) {
-        // Retry-After header value is either in HTTP date format, or in seconds
-        const retryAfterInSeconds = parseInt(retryAfter);
-        return isNaN(retryAfterInSeconds)
-            ? calculatePollingIntervalFromDate(new Date(retryAfter))
-            : retryAfterInSeconds * 1000;
-    }
-    return undefined;
-}
-function getErrorFromResponse(response) {
-    const error = accessBodyProperty(response, "error");
-    if (!error) {
-        logger.warning(`The long-running operation failed but there is no error property in the response's body`);
-        return;
-    }
-    if (!error.code || !error.message) {
-        logger.warning(`The long-running operation failed but the error property in the response's body doesn't contain code or message`);
-        return;
-    }
-    return error;
-}
-function calculatePollingIntervalFromDate(retryAfterDate) {
-    const timeNow = Math.floor(new Date().getTime());
-    const retryAfterTime = retryAfterDate.getTime();
-    if (timeNow < retryAfterTime) {
-        return retryAfterTime - timeNow;
-    }
-    return undefined;
-}
-function getStatusFromInitialResponse(inputs) {
-    const { response, state, operationLocation } = inputs;
-    function helper() {
-        var _a;
-        const mode = (_a = state.config.metadata) === null || _a === void 0 ? void 0 : _a["mode"];
-        switch (mode) {
-            case undefined:
-                return toOperationStatus(response.rawResponse.statusCode);
-            case "Body":
-                return getOperationStatus(response, state);
-            default:
-                return "running";
-        }
-    }
-    const status = helper();
-    return status === "running" && operationLocation === undefined ? "succeeded" : status;
-}
-/**
- * Initiates the long-running operation.
- */
-async function initHttpOperation(inputs) {
-    const { stateProxy, resourceLocationConfig, processResult, lro, setErrorAsResult } = inputs;
-    return initOperation({
-        init: async () => {
-            const response = await lro.sendInitialRequest();
-            const config = inferLroMode({
-                rawResponse: response.rawResponse,
-                requestPath: lro.requestPath,
-                requestMethod: lro.requestMethod,
-                resourceLocationConfig,
-            });
-            return Object.assign({ response, operationLocation: config === null || config === void 0 ? void 0 : config.operationLocation, resourceLocation: config === null || config === void 0 ? void 0 : config.resourceLocation }, ((config === null || config === void 0 ? void 0 : config.mode) ? { metadata: { mode: config.mode } } : {}));
-        },
-        stateProxy,
-        processResult: processResult
-            ? ({ flatResponse }, state) => processResult(flatResponse, state)
-            : ({ flatResponse }) => flatResponse,
-        getOperationStatus: getStatusFromInitialResponse,
-        setErrorAsResult,
-    });
-}
-function getOperationLocation({ rawResponse }, state) {
-    var _a;
-    const mode = (_a = state.config.metadata) === null || _a === void 0 ? void 0 : _a["mode"];
-    switch (mode) {
-        case "OperationLocation": {
-            return getOperationLocationPollingUrl({
-                operationLocation: getOperationLocationHeader(rawResponse),
-                azureAsyncOperation: getAzureAsyncOperationHeader(rawResponse),
-            });
-        }
-        case "ResourceLocation": {
-            return getLocationHeader(rawResponse);
-        }
-        case "Body":
-        default: {
-            return undefined;
-        }
-    }
-}
-function getOperationStatus({ rawResponse }, state) {
-    var _a;
-    const mode = (_a = state.config.metadata) === null || _a === void 0 ? void 0 : _a["mode"];
-    switch (mode) {
-        case "OperationLocation": {
-            return getStatus(rawResponse);
-        }
-        case "ResourceLocation": {
-            return toOperationStatus(rawResponse.statusCode);
-        }
-        case "Body": {
-            return getProvisioningState(rawResponse);
-        }
-        default:
-            throw new Error(`Internal error: Unexpected operation mode: ${mode}`);
-    }
-}
-function accessBodyProperty({ flatResponse, rawResponse }, prop) {
-    var _a, _b;
-    return (_a = flatResponse === null || flatResponse === void 0 ? void 0 : flatResponse[prop]) !== null && _a !== void 0 ? _a : (_b = rawResponse.body) === null || _b === void 0 ? void 0 : _b[prop];
-}
-function getResourceLocation(res, state) {
-    const loc = accessBodyProperty(res, "resourceLocation");
-    if (loc && typeof loc === "string") {
-        state.config.resourceLocation = loc;
-    }
-    return state.config.resourceLocation;
-}
-function isOperationError(e) {
-    return e.name === "RestError";
-}
-/** Polls the long-running operation. */
-async function pollHttpOperation(inputs) {
-    const { lro, stateProxy, options, processResult, updateState, setDelay, state, setErrorAsResult, } = inputs;
-    return pollOperation({
-        state,
-        stateProxy,
-        setDelay,
-        processResult: processResult
-            ? ({ flatResponse }, inputState) => processResult(flatResponse, inputState)
-            : ({ flatResponse }) => flatResponse,
-        getError: getErrorFromResponse,
-        updateState,
-        getPollingInterval: parseRetryAfter,
-        getOperationLocation,
-        getOperationStatus,
-        isOperationError,
-        getResourceLocation,
-        options,
-        /**
-         * The expansion here is intentional because `lro` could be an object that
-         * references an inner this, so we need to preserve a reference to it.
-         */
-        poll: async (location, inputOptions) => lro.sendPollRequest(location, inputOptions),
-        setErrorAsResult,
-    });
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-const createStateProxy$1 = () => ({
-    /**
-     * The state at this point is created to be of type OperationState<TResult>.
-     * It will be updated later to be of type TState when the
-     * customer-provided callback, `updateState`, is called during polling.
-     */
-    initState: (config) => ({ status: "running", config }),
-    setCanceled: (state) => (state.status = "canceled"),
-    setError: (state, error) => (state.error = error),
-    setResult: (state, result) => (state.result = result),
-    setRunning: (state) => (state.status = "running"),
-    setSucceeded: (state) => (state.status = "succeeded"),
-    setFailed: (state) => (state.status = "failed"),
-    getError: (state) => state.error,
-    getResult: (state) => state.result,
-    isCanceled: (state) => state.status === "canceled",
-    isFailed: (state) => state.status === "failed",
-    isRunning: (state) => state.status === "running",
-    isSucceeded: (state) => state.status === "succeeded",
-});
-/**
- * Returns a poller factory.
- */
-function buildCreatePoller(inputs) {
-    const { getOperationLocation, getStatusFromInitialResponse, getStatusFromPollResponse, isOperationError, getResourceLocation, getPollingInterval, getError, resolveOnUnsuccessful, } = inputs;
-    return async ({ init, poll }, options) => {
-        const { processResult, updateState, withOperationLocation: withOperationLocationCallback, intervalInMs = POLL_INTERVAL_IN_MS, restoreFrom, } = options || {};
-        const stateProxy = createStateProxy$1();
-        const withOperationLocation = withOperationLocationCallback
-            ? (() => {
-                let called = false;
-                return (operationLocation, isUpdated) => {
-                    if (isUpdated)
-                        withOperationLocationCallback(operationLocation);
-                    else if (!called)
-                        withOperationLocationCallback(operationLocation);
-                    called = true;
-                };
-            })()
-            : undefined;
-        const state = restoreFrom
-            ? deserializeState(restoreFrom)
-            : await initOperation({
-                init,
-                stateProxy,
-                processResult,
-                getOperationStatus: getStatusFromInitialResponse,
-                withOperationLocation,
-                setErrorAsResult: !resolveOnUnsuccessful,
-            });
-        let resultPromise;
-        const abortController = new AbortController();
-        const handlers = new Map();
-        const handleProgressEvents = async () => handlers.forEach((h) => h(state));
-        const cancelErrMsg = "Operation was canceled";
-        let currentPollIntervalInMs = intervalInMs;
-        const poller = {
-            getOperationState: () => state,
-            getResult: () => state.result,
-            isDone: () => ["succeeded", "failed", "canceled"].includes(state.status),
-            isStopped: () => resultPromise === undefined,
-            stopPolling: () => {
-                abortController.abort();
-            },
-            toString: () => JSON.stringify({
-                state,
-            }),
-            onProgress: (callback) => {
-                const s = Symbol();
-                handlers.set(s, callback);
-                return () => handlers.delete(s);
-            },
-            pollUntilDone: (pollOptions) => (resultPromise !== null && resultPromise !== void 0 ? resultPromise : (resultPromise = (async () => {
-                const { abortSignal: inputAbortSignal } = pollOptions || {};
-                // In the future we can use AbortSignal.any() instead
-                function abortListener() {
-                    abortController.abort();
-                }
-                const abortSignal = abortController.signal;
-                if (inputAbortSignal === null || inputAbortSignal === void 0 ? void 0 : inputAbortSignal.aborted) {
-                    abortController.abort();
-                }
-                else if (!abortSignal.aborted) {
-                    inputAbortSignal === null || inputAbortSignal === void 0 ? void 0 : inputAbortSignal.addEventListener("abort", abortListener, { once: true });
-                }
-                try {
-                    if (!poller.isDone()) {
-                        await poller.poll({ abortSignal });
-                        while (!poller.isDone()) {
-                            await coreUtil.delay(currentPollIntervalInMs, { abortSignal });
-                            await poller.poll({ abortSignal });
-                        }
-                    }
-                }
-                finally {
-                    inputAbortSignal === null || inputAbortSignal === void 0 ? void 0 : inputAbortSignal.removeEventListener("abort", abortListener);
-                }
-                if (resolveOnUnsuccessful) {
-                    return poller.getResult();
-                }
-                else {
-                    switch (state.status) {
-                        case "succeeded":
-                            return poller.getResult();
-                        case "canceled":
-                            throw new Error(cancelErrMsg);
-                        case "failed":
-                            throw state.error;
-                        case "notStarted":
-                        case "running":
-                            throw new Error(`Polling completed without succeeding or failing`);
-                    }
-                }
-            })().finally(() => {
-                resultPromise = undefined;
-            }))),
-            async poll(pollOptions) {
-                if (resolveOnUnsuccessful) {
-                    if (poller.isDone())
-                        return;
-                }
-                else {
-                    switch (state.status) {
-                        case "succeeded":
-                            return;
-                        case "canceled":
-                            throw new Error(cancelErrMsg);
-                        case "failed":
-                            throw state.error;
-                    }
-                }
-                await pollOperation({
-                    poll,
-                    state,
-                    stateProxy,
-                    getOperationLocation,
-                    isOperationError,
-                    withOperationLocation,
-                    getPollingInterval,
-                    getOperationStatus: getStatusFromPollResponse,
-                    getResourceLocation,
-                    processResult,
-                    getError,
-                    updateState,
-                    options: pollOptions,
-                    setDelay: (pollIntervalInMs) => {
-                        currentPollIntervalInMs = pollIntervalInMs;
-                    },
-                    setErrorAsResult: !resolveOnUnsuccessful,
-                });
-                await handleProgressEvents();
-                if (!resolveOnUnsuccessful) {
-                    switch (state.status) {
-                        case "canceled":
-                            throw new Error(cancelErrMsg);
-                        case "failed":
-                            throw state.error;
-                    }
-                }
-            },
-        };
-        return poller;
-    };
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * Creates a poller that can be used to poll a long-running operation.
- * @param lro - Description of the long-running operation
- * @param options - options to configure the poller
- * @returns an initialized poller
- */
-async function createHttpPoller(lro, options) {
-    const { resourceLocationConfig, intervalInMs, processResult, restoreFrom, updateState, withOperationLocation, resolveOnUnsuccessful = false, } = options || {};
-    return buildCreatePoller({
-        getStatusFromInitialResponse,
-        getStatusFromPollResponse: getOperationStatus,
-        isOperationError,
-        getOperationLocation,
-        getResourceLocation,
-        getPollingInterval: parseRetryAfter,
-        getError: getErrorFromResponse,
-        resolveOnUnsuccessful,
-    })({
-        init: async () => {
-            const response = await lro.sendInitialRequest();
-            const config = inferLroMode({
-                rawResponse: response.rawResponse,
-                requestPath: lro.requestPath,
-                requestMethod: lro.requestMethod,
-                resourceLocationConfig,
-            });
-            return Object.assign({ response, operationLocation: config === null || config === void 0 ? void 0 : config.operationLocation, resourceLocation: config === null || config === void 0 ? void 0 : config.resourceLocation }, ((config === null || config === void 0 ? void 0 : config.mode) ? { metadata: { mode: config.mode } } : {}));
-        },
-        poll: lro.sendPollRequest,
-    }, {
-        intervalInMs,
-        withOperationLocation,
-        restoreFrom,
-        updateState,
-        processResult: processResult
-            ? ({ flatResponse }, state) => processResult(flatResponse, state)
-            : ({ flatResponse }) => flatResponse,
-    });
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-const createStateProxy = () => ({
-    initState: (config) => ({ config, isStarted: true }),
-    setCanceled: (state) => (state.isCancelled = true),
-    setError: (state, error) => (state.error = error),
-    setResult: (state, result) => (state.result = result),
-    setRunning: (state) => (state.isStarted = true),
-    setSucceeded: (state) => (state.isCompleted = true),
-    setFailed: () => {
-        /** empty body */
-    },
-    getError: (state) => state.error,
-    getResult: (state) => state.result,
-    isCanceled: (state) => !!state.isCancelled,
-    isFailed: (state) => !!state.error,
-    isRunning: (state) => !!state.isStarted,
-    isSucceeded: (state) => Boolean(state.isCompleted && !state.isCancelled && !state.error),
-});
-class GenericPollOperation {
-    constructor(state, lro, setErrorAsResult, lroResourceLocationConfig, processResult, updateState, isDone) {
-        this.state = state;
-        this.lro = lro;
-        this.setErrorAsResult = setErrorAsResult;
-        this.lroResourceLocationConfig = lroResourceLocationConfig;
-        this.processResult = processResult;
-        this.updateState = updateState;
-        this.isDone = isDone;
-    }
-    setPollerConfig(pollerConfig) {
-        this.pollerConfig = pollerConfig;
-    }
-    async update(options) {
-        var _a;
-        const stateProxy = createStateProxy();
-        if (!this.state.isStarted) {
-            this.state = Object.assign(Object.assign({}, this.state), (await initHttpOperation({
-                lro: this.lro,
-                stateProxy,
-                resourceLocationConfig: this.lroResourceLocationConfig,
-                processResult: this.processResult,
-                setErrorAsResult: this.setErrorAsResult,
-            })));
-        }
-        const updateState = this.updateState;
-        const isDone = this.isDone;
-        if (!this.state.isCompleted && this.state.error === undefined) {
-            await pollHttpOperation({
-                lro: this.lro,
-                state: this.state,
-                stateProxy,
-                processResult: this.processResult,
-                updateState: updateState
-                    ? (state, { rawResponse }) => updateState(state, rawResponse)
-                    : undefined,
-                isDone: isDone
-                    ? ({ flatResponse }, state) => isDone(flatResponse, state)
-                    : undefined,
-                options,
-                setDelay: (intervalInMs) => {
-                    this.pollerConfig.intervalInMs = intervalInMs;
-                },
-                setErrorAsResult: this.setErrorAsResult,
-            });
-        }
-        (_a = options === null || options === void 0 ? void 0 : options.fireProgress) === null || _a === void 0 ? void 0 : _a.call(options, this.state);
-        return this;
-    }
-    async cancel() {
-        logger.error("`cancelOperation` is deprecated because it wasn't implemented");
-        return this;
-    }
-    /**
-     * Serializes the Poller operation.
-     */
-    toString() {
-        return JSON.stringify({
-            state: this.state,
-        });
-    }
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * When a poller is manually stopped through the `stopPolling` method,
- * the poller will be rejected with an instance of the PollerStoppedError.
- */
-class PollerStoppedError extends Error {
-    constructor(message) {
-        super(message);
-        this.name = "PollerStoppedError";
-        Object.setPrototypeOf(this, PollerStoppedError.prototype);
-    }
-}
-/**
- * When the operation is cancelled, the poller will be rejected with an instance
- * of the PollerCancelledError.
- */
-class PollerCancelledError extends Error {
-    constructor(message) {
-        super(message);
-        this.name = "PollerCancelledError";
-        Object.setPrototypeOf(this, PollerCancelledError.prototype);
-    }
-}
-/**
- * A class that represents the definition of a program that polls through consecutive requests
- * until it reaches a state of completion.
- *
- * A poller can be executed manually, by polling request by request by calling to the `poll()` method repeatedly, until its operation is completed.
- * It also provides a way to wait until the operation completes, by calling `pollUntilDone()` and waiting until the operation finishes.
- * Pollers can also request the cancellation of the ongoing process to whom is providing the underlying long running operation.
- *
- * ```ts
- * const poller = new MyPoller();
- *
- * // Polling just once:
- * await poller.poll();
- *
- * // We can try to cancel the request here, by calling:
- * //
- * //     await poller.cancelOperation();
- * //
- *
- * // Getting the final result:
- * const result = await poller.pollUntilDone();
- * ```
- *
- * The Poller is defined by two types, a type representing the state of the poller, which
- * must include a basic set of properties from `PollOperationState<TResult>`,
- * and a return type defined by `TResult`, which can be anything.
- *
- * The Poller class implements the `PollerLike` interface, which allows poller implementations to avoid having
- * to export the Poller's class directly, and instead only export the already instantiated poller with the PollerLike type.
- *
- * ```ts
- * class Client {
- *   public async makePoller: PollerLike<MyOperationState, MyResult> {
- *     const poller = new MyPoller({});
- *     // It might be preferred to return the poller after the first request is made,
- *     // so that some information can be obtained right away.
- *     await poller.poll();
- *     return poller;
- *   }
- * }
- *
- * const poller: PollerLike<MyOperationState, MyResult> = myClient.makePoller();
- * ```
- *
- * A poller can be created through its constructor, then it can be polled until it's completed.
- * At any point in time, the state of the poller can be obtained without delay through the getOperationState method.
- * At any point in time, the intermediate forms of the result type can be requested without delay.
- * Once the underlying operation is marked as completed, the poller will stop and the final value will be returned.
- *
- * ```ts
- * const poller = myClient.makePoller();
- * const state: MyOperationState = poller.getOperationState();
- *
- * // The intermediate result can be obtained at any time.
- * const result: MyResult | undefined = poller.getResult();
- *
- * // The final result can only be obtained after the poller finishes.
- * const result: MyResult = await poller.pollUntilDone();
- * ```
- *
- */
-// eslint-disable-next-line no-use-before-define
-class Poller {
-    /**
-     * A poller needs to be initialized by passing in at least the basic properties of the `PollOperation<TState, TResult>`.
-     *
-     * When writing an implementation of a Poller, this implementation needs to deal with the initialization
-     * of any custom state beyond the basic definition of the poller. The basic poller assumes that the poller's
-     * operation has already been defined, at least its basic properties. The code below shows how to approach
-     * the definition of the constructor of a new custom poller.
-     *
-     * ```ts
-     * export class MyPoller extends Poller<MyOperationState, string> {
-     *   constructor({
-     *     // Anything you might need outside of the basics
-     *   }) {
-     *     let state: MyOperationState = {
-     *       privateProperty: private,
-     *       publicProperty: public,
-     *     };
-     *
-     *     const operation = {
-     *       state,
-     *       update,
-     *       cancel,
-     *       toString
-     *     }
-     *
-     *     // Sending the operation to the parent's constructor.
-     *     super(operation);
-     *
-     *     // You can assign more local properties here.
-     *   }
-     * }
-     * ```
-     *
-     * Inside of this constructor, a new promise is created. This will be used to
-     * tell the user when the poller finishes (see `pollUntilDone()`). The promise's
-     * resolve and reject methods are also used internally to control when to resolve
-     * or reject anyone waiting for the poller to finish.
-     *
-     * The constructor of a custom implementation of a poller is where any serialized version of
-     * a previous poller's operation should be deserialized into the operation sent to the
-     * base constructor. For example:
-     *
-     * ```ts
-     * export class MyPoller extends Poller<MyOperationState, string> {
-     *   constructor(
-     *     baseOperation: string | undefined
-     *   ) {
-     *     let state: MyOperationState = {};
-     *     if (baseOperation) {
-     *       state = {
-     *         ...JSON.parse(baseOperation).state,
-     *         ...state
-     *       };
-     *     }
-     *     const operation = {
-     *       state,
-     *       // ...
-     *     }
-     *     super(operation);
-     *   }
-     * }
-     * ```
-     *
-     * @param operation - Must contain the basic properties of `PollOperation<State, TResult>`.
-     */
-    constructor(operation) {
-        /** controls whether to throw an error if the operation failed or was canceled. */
-        this.resolveOnUnsuccessful = false;
-        this.stopped = true;
-        this.pollProgressCallbacks = [];
-        this.operation = operation;
-        this.promise = new Promise((resolve, reject) => {
-            this.resolve = resolve;
-            this.reject = reject;
-        });
-        // This prevents the UnhandledPromiseRejectionWarning in node.js from being thrown.
-        // The above warning would get thrown if `poller.poll` is called, it returns an error,
-        // and pullUntilDone did not have a .catch or await try/catch on it's return value.
-        this.promise.catch(() => {
-            /* intentionally blank */
-        });
-    }
-    /**
-     * Starts a loop that will break only if the poller is done
-     * or if the poller is stopped.
-     */
-    async startPolling(pollOptions = {}) {
-        if (this.stopped) {
-            this.stopped = false;
-        }
-        while (!this.isStopped() && !this.isDone()) {
-            await this.poll(pollOptions);
-            await this.delay();
-        }
-    }
-    /**
-     * pollOnce does one polling, by calling to the update method of the underlying
-     * poll operation to make any relevant change effective.
-     *
-     * It only optionally receives an object with an abortSignal property, from \@azure/abort-controller's AbortSignalLike.
-     *
-     * @param options - Optional properties passed to the operation's update method.
-     */
-    async pollOnce(options = {}) {
-        if (!this.isDone()) {
-            this.operation = await this.operation.update({
-                abortSignal: options.abortSignal,
-                fireProgress: this.fireProgress.bind(this),
-            });
-        }
-        this.processUpdatedState();
-    }
-    /**
-     * fireProgress calls the functions passed in via onProgress the method of the poller.
-     *
-     * It loops over all of the callbacks received from onProgress, and executes them, sending them
-     * the current operation state.
-     *
-     * @param state - The current operation state.
-     */
-    fireProgress(state) {
-        for (const callback of this.pollProgressCallbacks) {
-            callback(state);
-        }
-    }
-    /**
-     * Invokes the underlying operation's cancel method.
-     */
-    async cancelOnce(options = {}) {
-        this.operation = await this.operation.cancel(options);
-    }
-    /**
-     * Returns a promise that will resolve once a single polling request finishes.
-     * It does this by calling the update method of the Poller's operation.
-     *
-     * It only optionally receives an object with an abortSignal property, from \@azure/abort-controller's AbortSignalLike.
-     *
-     * @param options - Optional properties passed to the operation's update method.
-     */
-    poll(options = {}) {
-        if (!this.pollOncePromise) {
-            this.pollOncePromise = this.pollOnce(options);
-            const clearPollOncePromise = () => {
-                this.pollOncePromise = undefined;
-            };
-            this.pollOncePromise.then(clearPollOncePromise, clearPollOncePromise).catch(this.reject);
-        }
-        return this.pollOncePromise;
-    }
-    processUpdatedState() {
-        if (this.operation.state.error) {
-            this.stopped = true;
-            if (!this.resolveOnUnsuccessful) {
-                this.reject(this.operation.state.error);
-                throw this.operation.state.error;
-            }
-        }
-        if (this.operation.state.isCancelled) {
-            this.stopped = true;
-            if (!this.resolveOnUnsuccessful) {
-                const error = new PollerCancelledError("Operation was canceled");
-                this.reject(error);
-                throw error;
-            }
-        }
-        if (this.isDone() && this.resolve) {
-            // If the poller has finished polling, this means we now have a result.
-            // However, it can be the case that TResult is instantiated to void, so
-            // we are not expecting a result anyway. To assert that we might not
-            // have a result eventually after finishing polling, we cast the result
-            // to TResult.
-            this.resolve(this.getResult());
-        }
-    }
-    /**
-     * Returns a promise that will resolve once the underlying operation is completed.
-     */
-    async pollUntilDone(pollOptions = {}) {
-        if (this.stopped) {
-            this.startPolling(pollOptions).catch(this.reject);
-        }
-        // This is needed because the state could have been updated by
-        // `cancelOperation`, e.g. the operation is canceled or an error occurred.
-        this.processUpdatedState();
-        return this.promise;
-    }
-    /**
-     * Invokes the provided callback after each polling is completed,
-     * sending the current state of the poller's operation.
-     *
-     * It returns a method that can be used to stop receiving updates on the given callback function.
-     */
-    onProgress(callback) {
-        this.pollProgressCallbacks.push(callback);
-        return () => {
-            this.pollProgressCallbacks = this.pollProgressCallbacks.filter((c) => c !== callback);
-        };
-    }
-    /**
-     * Returns true if the poller has finished polling.
-     */
-    isDone() {
-        const state = this.operation.state;
-        return Boolean(state.isCompleted || state.isCancelled || state.error);
-    }
-    /**
-     * Stops the poller from continuing to poll.
-     */
-    stopPolling() {
-        if (!this.stopped) {
-            this.stopped = true;
-            if (this.reject) {
-                this.reject(new PollerStoppedError("This poller is already stopped"));
-            }
-        }
-    }
-    /**
-     * Returns true if the poller is stopped.
-     */
-    isStopped() {
-        return this.stopped;
-    }
-    /**
-     * Attempts to cancel the underlying operation.
-     *
-     * It only optionally receives an object with an abortSignal property, from \@azure/abort-controller's AbortSignalLike.
-     *
-     * If it's called again before it finishes, it will throw an error.
-     *
-     * @param options - Optional properties passed to the operation's update method.
-     */
-    cancelOperation(options = {}) {
-        if (!this.cancelPromise) {
-            this.cancelPromise = this.cancelOnce(options);
-        }
-        else if (options.abortSignal) {
-            throw new Error("A cancel request is currently pending");
-        }
-        return this.cancelPromise;
-    }
-    /**
-     * Returns the state of the operation.
-     *
-     * Even though TState will be the same type inside any of the methods of any extension of the Poller class,
-     * implementations of the pollers can customize what's shared with the public by writing their own
-     * version of the `getOperationState` method, and by defining two types, one representing the internal state of the poller
-     * and a public type representing a safe to share subset of the properties of the internal state.
-     * Their definition of getOperationState can then return their public type.
-     *
-     * Example:
-     *
-     * ```ts
-     * // Let's say we have our poller's operation state defined as:
-     * interface MyOperationState extends PollOperationState<ResultType> {
-     *   privateProperty?: string;
-     *   publicProperty?: string;
-     * }
-     *
-     * // To allow us to have a true separation of public and private state, we have to define another interface:
-     * interface PublicState extends PollOperationState<ResultType> {
-     *   publicProperty?: string;
-     * }
-     *
-     * // Then, we define our Poller as follows:
-     * export class MyPoller extends Poller<MyOperationState, ResultType> {
-     *   // ... More content is needed here ...
-     *
-     *   public getOperationState(): PublicState {
-     *     const state: PublicState = this.operation.state;
-     *     return {
-     *       // Properties from PollOperationState<TResult>
-     *       isStarted: state.isStarted,
-     *       isCompleted: state.isCompleted,
-     *       isCancelled: state.isCancelled,
-     *       error: state.error,
-     *       result: state.result,
-     *
-     *       // The only other property needed by PublicState.
-     *       publicProperty: state.publicProperty
-     *     }
-     *   }
-     * }
-     * ```
-     *
-     * You can see this in the tests of this repository, go to the file:
-     * `../test/utils/testPoller.ts`
-     * and look for the getOperationState implementation.
-     */
-    getOperationState() {
-        return this.operation.state;
-    }
-    /**
-     * Returns the result value of the operation,
-     * regardless of the state of the poller.
-     * It can return undefined or an incomplete form of the final TResult value
-     * depending on the implementation.
-     */
-    getResult() {
-        const state = this.operation.state;
-        return state.result;
-    }
-    /**
-     * Returns a serialized version of the poller's operation
-     * by invoking the operation's toString method.
-     */
-    toString() {
-        return this.operation.toString();
-    }
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * The LRO Engine, a class that performs polling.
- */
-class LroEngine extends Poller {
-    constructor(lro, options) {
-        const { intervalInMs = POLL_INTERVAL_IN_MS, resumeFrom, resolveOnUnsuccessful = false, isDone, lroResourceLocationConfig, processResult, updateState, } = options || {};
-        const state = resumeFrom
-            ? deserializeState(resumeFrom)
-            : {};
-        const operation = new GenericPollOperation(state, lro, !resolveOnUnsuccessful, lroResourceLocationConfig, processResult, updateState, isDone);
-        super(operation);
-        this.resolveOnUnsuccessful = resolveOnUnsuccessful;
-        this.config = { intervalInMs: intervalInMs };
-        operation.setPollerConfig(this.config);
-    }
-    /**
-     * The method used by the poller to wait before attempting to update its operation.
-     */
-    delay() {
-        return new Promise((resolve) => setTimeout(() => resolve(), this.config.intervalInMs));
-    }
-}
-
-exports.LroEngine = LroEngine;
-exports.Poller = Poller;
-exports.PollerCancelledError = PollerCancelledError;
-exports.PollerStoppedError = PollerStoppedError;
-exports.createHttpPoller = createHttpPoller;
-//# sourceMappingURL=index.js.map
-
-
-/***/ }),
-
-/***/ 7937:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-
-var tslib = __nccwpck_require__(36);
-
-// Copyright (c) Microsoft Corporation.
-/**
- * returns an async iterator that iterates over results. It also has a `byPage`
- * method that returns pages of items at once.
- *
- * @param pagedResult - an object that specifies how to get pages.
- * @returns a paged async iterator that iterates over results.
- */
-function getPagedAsyncIterator(pagedResult) {
-    var _a;
-    const iter = getItemAsyncIterator(pagedResult);
-    return {
-        next() {
-            return iter.next();
-        },
-        [Symbol.asyncIterator]() {
-            return this;
-        },
-        byPage: (_a = pagedResult === null || pagedResult === void 0 ? void 0 : pagedResult.byPage) !== null && _a !== void 0 ? _a : ((settings) => {
-            const { continuationToken, maxPageSize } = settings !== null && settings !== void 0 ? settings : {};
-            return getPageAsyncIterator(pagedResult, {
-                pageLink: continuationToken,
-                maxPageSize,
-            });
-        }),
-    };
-}
-function getItemAsyncIterator(pagedResult) {
-    return tslib.__asyncGenerator(this, arguments, function* getItemAsyncIterator_1() {
-        var e_1, _a, e_2, _b;
-        const pages = getPageAsyncIterator(pagedResult);
-        const firstVal = yield tslib.__await(pages.next());
-        // if the result does not have an array shape, i.e. TPage = TElement, then we return it as is
-        if (!Array.isArray(firstVal.value)) {
-            // can extract elements from this page
-            const { toElements } = pagedResult;
-            if (toElements) {
-                yield tslib.__await(yield* tslib.__asyncDelegator(tslib.__asyncValues(toElements(firstVal.value))));
-                try {
-                    for (var pages_1 = tslib.__asyncValues(pages), pages_1_1; pages_1_1 = yield tslib.__await(pages_1.next()), !pages_1_1.done;) {
-                        const page = pages_1_1.value;
-                        yield tslib.__await(yield* tslib.__asyncDelegator(tslib.__asyncValues(toElements(page))));
-                    }
-                }
-                catch (e_1_1) { e_1 = { error: e_1_1 }; }
-                finally {
-                    try {
-                        if (pages_1_1 && !pages_1_1.done && (_a = pages_1.return)) yield tslib.__await(_a.call(pages_1));
-                    }
-                    finally { if (e_1) throw e_1.error; }
-                }
-            }
-            else {
-                yield yield tslib.__await(firstVal.value);
-                // `pages` is of type `AsyncIterableIterator<TPage>` but TPage = TElement in this case
-                yield tslib.__await(yield* tslib.__asyncDelegator(tslib.__asyncValues(pages)));
-            }
-        }
-        else {
-            yield tslib.__await(yield* tslib.__asyncDelegator(tslib.__asyncValues(firstVal.value)));
-            try {
-                for (var pages_2 = tslib.__asyncValues(pages), pages_2_1; pages_2_1 = yield tslib.__await(pages_2.next()), !pages_2_1.done;) {
-                    const page = pages_2_1.value;
-                    // pages is of type `AsyncIterableIterator<TPage>` so `page` is of type `TPage`. In this branch,
-                    // it must be the case that `TPage = TElement[]`
-                    yield tslib.__await(yield* tslib.__asyncDelegator(tslib.__asyncValues(page)));
-                }
-            }
-            catch (e_2_1) { e_2 = { error: e_2_1 }; }
-            finally {
-                try {
-                    if (pages_2_1 && !pages_2_1.done && (_b = pages_2.return)) yield tslib.__await(_b.call(pages_2));
-                }
-                finally { if (e_2) throw e_2.error; }
-            }
-        }
-    });
-}
-function getPageAsyncIterator(pagedResult, options = {}) {
-    return tslib.__asyncGenerator(this, arguments, function* getPageAsyncIterator_1() {
-        const { pageLink, maxPageSize } = options;
-        let response = yield tslib.__await(pagedResult.getPage(pageLink !== null && pageLink !== void 0 ? pageLink : pagedResult.firstPageLink, maxPageSize));
-        if (!response) {
-            return yield tslib.__await(void 0);
-        }
-        yield yield tslib.__await(response.page);
-        while (response.nextPageLink) {
-            response = yield tslib.__await(pagedResult.getPage(response.nextPageLink, maxPageSize));
-            if (!response) {
-                return yield tslib.__await(void 0);
-            }
-            yield yield tslib.__await(response.page);
-        }
-    });
-}
-
-exports.getPagedAsyncIterator = getPagedAsyncIterator;
-//# sourceMappingURL=index.js.map
-
-
-/***/ }),
-
 /***/ 3580:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -20237,630 +14754,6 @@ exports.setSpanContext = setSpanContext;
 
 /***/ }),
 
-/***/ 6959:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-
-var abortController = __nccwpck_require__(6169);
-var crypto = __nccwpck_require__(6113);
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * Creates an abortable promise.
- * @param buildPromise - A function that takes the resolve and reject functions as parameters.
- * @param options - The options for the abortable promise.
- * @returns A promise that can be aborted.
- */
-function createAbortablePromise(buildPromise, options) {
-    const { cleanupBeforeAbort, abortSignal, abortErrorMsg } = options !== null && options !== void 0 ? options : {};
-    return new Promise((resolve, reject) => {
-        function rejectOnAbort() {
-            reject(new abortController.AbortError(abortErrorMsg !== null && abortErrorMsg !== void 0 ? abortErrorMsg : "The operation was aborted."));
-        }
-        function removeListeners() {
-            abortSignal === null || abortSignal === void 0 ? void 0 : abortSignal.removeEventListener("abort", onAbort);
-        }
-        function onAbort() {
-            cleanupBeforeAbort === null || cleanupBeforeAbort === void 0 ? void 0 : cleanupBeforeAbort();
-            removeListeners();
-            rejectOnAbort();
-        }
-        if (abortSignal === null || abortSignal === void 0 ? void 0 : abortSignal.aborted) {
-            return rejectOnAbort();
-        }
-        try {
-            buildPromise((x) => {
-                removeListeners();
-                resolve(x);
-            }, (x) => {
-                removeListeners();
-                reject(x);
-            });
-        }
-        catch (err) {
-            reject(err);
-        }
-        abortSignal === null || abortSignal === void 0 ? void 0 : abortSignal.addEventListener("abort", onAbort);
-    });
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-const StandardAbortMessage = "The delay was aborted.";
-/**
- * A wrapper for setTimeout that resolves a promise after timeInMs milliseconds.
- * @param timeInMs - The number of milliseconds to be delayed.
- * @param options - The options for delay - currently abort options
- * @returns Promise that is resolved after timeInMs
- */
-function delay(timeInMs, options) {
-    let token;
-    const { abortSignal, abortErrorMsg } = options !== null && options !== void 0 ? options : {};
-    return createAbortablePromise((resolve) => {
-        token = setTimeout(resolve, timeInMs);
-    }, {
-        cleanupBeforeAbort: () => clearTimeout(token),
-        abortSignal,
-        abortErrorMsg: abortErrorMsg !== null && abortErrorMsg !== void 0 ? abortErrorMsg : StandardAbortMessage,
-    });
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * promise.race() wrapper that aborts rest of promises as soon as the first promise settles.
- */
-async function cancelablePromiseRace(abortablePromiseBuilders, options) {
-    var _a, _b;
-    const aborter = new AbortController();
-    function abortHandler() {
-        aborter.abort();
-    }
-    (_a = options === null || options === void 0 ? void 0 : options.abortSignal) === null || _a === void 0 ? void 0 : _a.addEventListener("abort", abortHandler);
-    try {
-        return await Promise.race(abortablePromiseBuilders.map((p) => p({ abortSignal: aborter.signal })));
-    }
-    finally {
-        aborter.abort();
-        (_b = options === null || options === void 0 ? void 0 : options.abortSignal) === null || _b === void 0 ? void 0 : _b.removeEventListener("abort", abortHandler);
-    }
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * Returns a random integer value between a lower and upper bound,
- * inclusive of both bounds.
- * Note that this uses Math.random and isn't secure. If you need to use
- * this for any kind of security purpose, find a better source of random.
- * @param min - The smallest integer value allowed.
- * @param max - The largest integer value allowed.
- */
-function getRandomIntegerInclusive(min, max) {
-    // Make sure inputs are integers.
-    min = Math.ceil(min);
-    max = Math.floor(max);
-    // Pick a random offset from zero to the size of the range.
-    // Since Math.random() can never return 1, we have to make the range one larger
-    // in order to be inclusive of the maximum value after we take the floor.
-    const offset = Math.floor(Math.random() * (max - min + 1));
-    return offset + min;
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * Helper to determine when an input is a generic JS object.
- * @returns true when input is an object type that is not null, Array, RegExp, or Date.
- */
-function isObject(input) {
-    return (typeof input === "object" &&
-        input !== null &&
-        !Array.isArray(input) &&
-        !(input instanceof RegExp) &&
-        !(input instanceof Date));
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * Typeguard for an error object shape (has name and message)
- * @param e - Something caught by a catch clause.
- */
-function isError(e) {
-    if (isObject(e)) {
-        const hasName = typeof e.name === "string";
-        const hasMessage = typeof e.message === "string";
-        return hasName && hasMessage;
-    }
-    return false;
-}
-/**
- * Given what is thought to be an error object, return the message if possible.
- * If the message is missing, returns a stringified version of the input.
- * @param e - Something thrown from a try block
- * @returns The error message or a string of the input
- */
-function getErrorMessage(e) {
-    if (isError(e)) {
-        return e.message;
-    }
-    else {
-        let stringified;
-        try {
-            if (typeof e === "object" && e) {
-                stringified = JSON.stringify(e);
-            }
-            else {
-                stringified = String(e);
-            }
-        }
-        catch (err) {
-            stringified = "[unable to stringify input]";
-        }
-        return `Unknown error ${stringified}`;
-    }
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * Generates a SHA-256 HMAC signature.
- * @param key - The HMAC key represented as a base64 string, used to generate the cryptographic HMAC hash.
- * @param stringToSign - The data to be signed.
- * @param encoding - The textual encoding to use for the returned HMAC digest.
- */
-async function computeSha256Hmac(key, stringToSign, encoding) {
-    const decodedKey = Buffer.from(key, "base64");
-    return crypto.createHmac("sha256", decodedKey).update(stringToSign).digest(encoding);
-}
-/**
- * Generates a SHA-256 hash.
- * @param content - The data to be included in the hash.
- * @param encoding - The textual encoding to use for the returned hash.
- */
-async function computeSha256Hash(content, encoding) {
-    return crypto.createHash("sha256").update(content).digest(encoding);
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * Helper TypeGuard that checks if something is defined or not.
- * @param thing - Anything
- */
-function isDefined(thing) {
-    return typeof thing !== "undefined" && thing !== null;
-}
-/**
- * Helper TypeGuard that checks if the input is an object with the specified properties.
- * @param thing - Anything.
- * @param properties - The name of the properties that should appear in the object.
- */
-function isObjectWithProperties(thing, properties) {
-    if (!isDefined(thing) || typeof thing !== "object") {
-        return false;
-    }
-    for (const property of properties) {
-        if (!objectHasProperty(thing, property)) {
-            return false;
-        }
-    }
-    return true;
-}
-/**
- * Helper TypeGuard that checks if the input is an object with the specified property.
- * @param thing - Any object.
- * @param property - The name of the property that should appear in the object.
- */
-function objectHasProperty(thing, property) {
-    return (isDefined(thing) && typeof thing === "object" && property in thing);
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/*
- * NOTE: When moving this file, please update "react-native" section in package.json.
- */
-/**
- * Generated Universally Unique Identifier
- *
- * @returns RFC4122 v4 UUID.
- */
-function generateUUID() {
-    let uuid = "";
-    for (let i = 0; i < 32; i++) {
-        // Generate a random number between 0 and 15
-        const randomNumber = Math.floor(Math.random() * 16);
-        // Set the UUID version to 4 in the 13th position
-        if (i === 12) {
-            uuid += "4";
-        }
-        else if (i === 16) {
-            // Set the UUID variant to "10" in the 17th position
-            uuid += (randomNumber & 0x3) | 0x8;
-        }
-        else {
-            // Add a random hexadecimal digit to the UUID string
-            uuid += randomNumber.toString(16);
-        }
-        // Add hyphens to the UUID string at the appropriate positions
-        if (i === 7 || i === 11 || i === 15 || i === 19) {
-            uuid += "-";
-        }
-    }
-    return uuid;
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-var _a$1;
-// NOTE: This is a workaround until we can use `globalThis.crypto.randomUUID` in Node.js 19+.
-let uuidFunction = typeof ((_a$1 = globalThis === null || globalThis === void 0 ? void 0 : globalThis.crypto) === null || _a$1 === void 0 ? void 0 : _a$1.randomUUID) === "function"
-    ? globalThis.crypto.randomUUID.bind(globalThis.crypto)
-    : crypto.randomUUID;
-// Not defined in earlier versions of Node.js 14
-if (!uuidFunction) {
-    uuidFunction = generateUUID;
-}
-/**
- * Generated Universally Unique Identifier
- *
- * @returns RFC4122 v4 UUID.
- */
-function randomUUID() {
-    return uuidFunction();
-}
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-var _a, _b, _c, _d;
-/**
- * A constant that indicates whether the environment the code is running is a Web Browser.
- */
-// eslint-disable-next-line @azure/azure-sdk/ts-no-window
-const isBrowser = typeof window !== "undefined" && typeof window.document !== "undefined";
-/**
- * A constant that indicates whether the environment the code is running is a Web Worker.
- */
-const isWebWorker = typeof self === "object" &&
-    typeof (self === null || self === void 0 ? void 0 : self.importScripts) === "function" &&
-    (((_a = self.constructor) === null || _a === void 0 ? void 0 : _a.name) === "DedicatedWorkerGlobalScope" ||
-        ((_b = self.constructor) === null || _b === void 0 ? void 0 : _b.name) === "ServiceWorkerGlobalScope" ||
-        ((_c = self.constructor) === null || _c === void 0 ? void 0 : _c.name) === "SharedWorkerGlobalScope");
-/**
- * A constant that indicates whether the environment the code is running is Deno.
- */
-const isDeno = typeof Deno !== "undefined" &&
-    typeof Deno.version !== "undefined" &&
-    typeof Deno.version.deno !== "undefined";
-/**
- * A constant that indicates whether the environment the code is running is Node.JS.
- */
-const isNode = typeof process !== "undefined" &&
-    Boolean(process.version) &&
-    Boolean((_d = process.versions) === null || _d === void 0 ? void 0 : _d.node) &&
-    // Deno thought it was a good idea to spoof process.versions.node, see https://deno.land/std@0.177.0/node/process.ts?s=versions
-    !isDeno;
-/**
- * A constant that indicates whether the environment the code is running is Bun.sh.
- */
-const isBun = typeof Bun !== "undefined" && typeof Bun.version !== "undefined";
-/**
- * A constant that indicates whether the environment the code is running is in React-Native.
- */
-// https://github.com/facebook/react-native/blob/main/packages/react-native/Libraries/Core/setUpNavigator.js
-const isReactNative = typeof navigator !== "undefined" && (navigator === null || navigator === void 0 ? void 0 : navigator.product) === "ReactNative";
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * The helper that transforms bytes with specific character encoding into string
- * @param bytes - the uint8array bytes
- * @param format - the format we use to encode the byte
- * @returns a string of the encoded string
- */
-function uint8ArrayToString(bytes, format) {
-    return Buffer.from(bytes).toString(format);
-}
-/**
- * The helper that transforms string to specific character encoded bytes array.
- * @param value - the string to be converted
- * @param format - the format we use to decode the value
- * @returns a uint8array
- */
-function stringToUint8Array(value, format) {
-    return Buffer.from(value, format);
-}
-
-exports.cancelablePromiseRace = cancelablePromiseRace;
-exports.computeSha256Hash = computeSha256Hash;
-exports.computeSha256Hmac = computeSha256Hmac;
-exports.createAbortablePromise = createAbortablePromise;
-exports.delay = delay;
-exports.getErrorMessage = getErrorMessage;
-exports.getRandomIntegerInclusive = getRandomIntegerInclusive;
-exports.isBrowser = isBrowser;
-exports.isBun = isBun;
-exports.isDefined = isDefined;
-exports.isDeno = isDeno;
-exports.isError = isError;
-exports.isNode = isNode;
-exports.isObject = isObject;
-exports.isObjectWithProperties = isObjectWithProperties;
-exports.isReactNative = isReactNative;
-exports.isWebWorker = isWebWorker;
-exports.objectHasProperty = objectHasProperty;
-exports.randomUUID = randomUUID;
-exports.stringToUint8Array = stringToUint8Array;
-exports.uint8ArrayToString = uint8ArrayToString;
-//# sourceMappingURL=index.js.map
-
-
-/***/ }),
-
-/***/ 6169:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * This error is thrown when an asynchronous operation has been aborted.
- * Check for this error by testing the `name` that the name property of the
- * error matches `"AbortError"`.
- *
- * @example
- * ```ts
- * const controller = new AbortController();
- * controller.abort();
- * try {
- *   doAsyncWork(controller.signal)
- * } catch (e) {
- *   if (e.name === 'AbortError') {
- *     // handle abort error here.
- *   }
- * }
- * ```
- */
-class AbortError extends Error {
-    constructor(message) {
-        super(message);
-        this.name = "AbortError";
-    }
-}
-
-exports.AbortError = AbortError;
-//# sourceMappingURL=index.js.map
-
-
-/***/ }),
-
-/***/ 4766:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-
-var os = __nccwpck_require__(2037);
-var util = __nccwpck_require__(3837);
-
-function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
-
-var util__default = /*#__PURE__*/_interopDefaultLegacy(util);
-
-// Copyright (c) Microsoft Corporation.
-function log(message, ...args) {
-    process.stderr.write(`${util__default["default"].format(message, ...args)}${os.EOL}`);
-}
-
-// Copyright (c) Microsoft Corporation.
-const debugEnvVariable = (typeof process !== "undefined" && process.env && process.env.DEBUG) || undefined;
-let enabledString;
-let enabledNamespaces = [];
-let skippedNamespaces = [];
-const debuggers = [];
-if (debugEnvVariable) {
-    enable(debugEnvVariable);
-}
-const debugObj = Object.assign((namespace) => {
-    return createDebugger(namespace);
-}, {
-    enable,
-    enabled,
-    disable,
-    log,
-});
-function enable(namespaces) {
-    enabledString = namespaces;
-    enabledNamespaces = [];
-    skippedNamespaces = [];
-    const wildcard = /\*/g;
-    const namespaceList = namespaces.split(",").map((ns) => ns.trim().replace(wildcard, ".*?"));
-    for (const ns of namespaceList) {
-        if (ns.startsWith("-")) {
-            skippedNamespaces.push(new RegExp(`^${ns.substr(1)}$`));
-        }
-        else {
-            enabledNamespaces.push(new RegExp(`^${ns}$`));
-        }
-    }
-    for (const instance of debuggers) {
-        instance.enabled = enabled(instance.namespace);
-    }
-}
-function enabled(namespace) {
-    if (namespace.endsWith("*")) {
-        return true;
-    }
-    for (const skipped of skippedNamespaces) {
-        if (skipped.test(namespace)) {
-            return false;
-        }
-    }
-    for (const enabledNamespace of enabledNamespaces) {
-        if (enabledNamespace.test(namespace)) {
-            return true;
-        }
-    }
-    return false;
-}
-function disable() {
-    const result = enabledString || "";
-    enable("");
-    return result;
-}
-function createDebugger(namespace) {
-    const newDebugger = Object.assign(debug, {
-        enabled: enabled(namespace),
-        destroy,
-        log: debugObj.log,
-        namespace,
-        extend,
-    });
-    function debug(...args) {
-        if (!newDebugger.enabled) {
-            return;
-        }
-        if (args.length > 0) {
-            args[0] = `${namespace} ${args[0]}`;
-        }
-        newDebugger.log(...args);
-    }
-    debuggers.push(newDebugger);
-    return newDebugger;
-}
-function destroy() {
-    const index = debuggers.indexOf(this);
-    if (index >= 0) {
-        debuggers.splice(index, 1);
-        return true;
-    }
-    return false;
-}
-function extend(namespace) {
-    const newDebugger = createDebugger(`${this.namespace}:${namespace}`);
-    newDebugger.log = this.log;
-    return newDebugger;
-}
-var debug = debugObj;
-
-// Copyright (c) Microsoft Corporation.
-const registeredLoggers = new Set();
-const logLevelFromEnv = (typeof process !== "undefined" && process.env && process.env.AZURE_LOG_LEVEL) || undefined;
-let azureLogLevel;
-/**
- * The AzureLogger provides a mechanism for overriding where logs are output to.
- * By default, logs are sent to stderr.
- * Override the `log` method to redirect logs to another location.
- */
-const AzureLogger = debug("azure");
-AzureLogger.log = (...args) => {
-    debug.log(...args);
-};
-const AZURE_LOG_LEVELS = ["verbose", "info", "warning", "error"];
-if (logLevelFromEnv) {
-    // avoid calling setLogLevel because we don't want a mis-set environment variable to crash
-    if (isAzureLogLevel(logLevelFromEnv)) {
-        setLogLevel(logLevelFromEnv);
-    }
-    else {
-        console.error(`AZURE_LOG_LEVEL set to unknown log level '${logLevelFromEnv}'; logging is not enabled. Acceptable values: ${AZURE_LOG_LEVELS.join(", ")}.`);
-    }
-}
-/**
- * Immediately enables logging at the specified log level. If no level is specified, logging is disabled.
- * @param level - The log level to enable for logging.
- * Options from most verbose to least verbose are:
- * - verbose
- * - info
- * - warning
- * - error
- */
-function setLogLevel(level) {
-    if (level && !isAzureLogLevel(level)) {
-        throw new Error(`Unknown log level '${level}'. Acceptable values: ${AZURE_LOG_LEVELS.join(",")}`);
-    }
-    azureLogLevel = level;
-    const enabledNamespaces = [];
-    for (const logger of registeredLoggers) {
-        if (shouldEnable(logger)) {
-            enabledNamespaces.push(logger.namespace);
-        }
-    }
-    debug.enable(enabledNamespaces.join(","));
-}
-/**
- * Retrieves the currently specified log level.
- */
-function getLogLevel() {
-    return azureLogLevel;
-}
-const levelMap = {
-    verbose: 400,
-    info: 300,
-    warning: 200,
-    error: 100,
-};
-/**
- * Creates a logger for use by the Azure SDKs that inherits from `AzureLogger`.
- * @param namespace - The name of the SDK package.
- * @hidden
- */
-function createClientLogger(namespace) {
-    const clientRootLogger = AzureLogger.extend(namespace);
-    patchLogMethod(AzureLogger, clientRootLogger);
-    return {
-        error: createLogger(clientRootLogger, "error"),
-        warning: createLogger(clientRootLogger, "warning"),
-        info: createLogger(clientRootLogger, "info"),
-        verbose: createLogger(clientRootLogger, "verbose"),
-    };
-}
-function patchLogMethod(parent, child) {
-    child.log = (...args) => {
-        parent.log(...args);
-    };
-}
-function createLogger(parent, level) {
-    const logger = Object.assign(parent.extend(level), {
-        level,
-    });
-    patchLogMethod(parent, logger);
-    if (shouldEnable(logger)) {
-        const enabledNamespaces = debug.disable();
-        debug.enable(enabledNamespaces + "," + logger.namespace);
-    }
-    registeredLoggers.add(logger);
-    return logger;
-}
-function shouldEnable(logger) {
-    return Boolean(azureLogLevel && levelMap[logger.level] <= levelMap[azureLogLevel]);
-}
-function isAzureLogLevel(logLevel) {
-    return AZURE_LOG_LEVELS.includes(logLevel);
-}
-
-exports.AzureLogger = AzureLogger;
-exports.createClientLogger = createClientLogger;
-exports.getLogLevel = getLogLevel;
-exports.setLogLevel = setLogLevel;
-//# sourceMappingURL=index.js.map
-
-
-/***/ }),
-
 /***/ 3625:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -20872,13 +14765,13 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 var coreHttp = __nccwpck_require__(5316);
 var tslib = __nccwpck_require__(36);
 var coreTracing = __nccwpck_require__(3580);
-var logger$1 = __nccwpck_require__(4766);
+var logger$1 = __nccwpck_require__(865);
 var abortController = __nccwpck_require__(6455);
 var os = __nccwpck_require__(2037);
 var crypto = __nccwpck_require__(6113);
 var stream = __nccwpck_require__(2781);
-__nccwpck_require__(7937);
-var coreLro = __nccwpck_require__(9845);
+__nccwpck_require__(7121);
+var coreLro = __nccwpck_require__(2173);
 var events = __nccwpck_require__(2361);
 var fs = __nccwpck_require__(7147);
 var util = __nccwpck_require__(3837);
@@ -49215,6 +43108,214 @@ function range(a, b, str) {
 
 /***/ }),
 
+/***/ 3197:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var concatMap = __nccwpck_require__(4527);
+var balanced = __nccwpck_require__(3353);
+
+module.exports = expandTop;
+
+var escSlash = '\0SLASH'+Math.random()+'\0';
+var escOpen = '\0OPEN'+Math.random()+'\0';
+var escClose = '\0CLOSE'+Math.random()+'\0';
+var escComma = '\0COMMA'+Math.random()+'\0';
+var escPeriod = '\0PERIOD'+Math.random()+'\0';
+
+function numeric(str) {
+  return parseInt(str, 10) == str
+    ? parseInt(str, 10)
+    : str.charCodeAt(0);
+}
+
+function escapeBraces(str) {
+  return str.split('\\\\').join(escSlash)
+            .split('\\{').join(escOpen)
+            .split('\\}').join(escClose)
+            .split('\\,').join(escComma)
+            .split('\\.').join(escPeriod);
+}
+
+function unescapeBraces(str) {
+  return str.split(escSlash).join('\\')
+            .split(escOpen).join('{')
+            .split(escClose).join('}')
+            .split(escComma).join(',')
+            .split(escPeriod).join('.');
+}
+
+
+// Basically just str.split(","), but handling cases
+// where we have nested braced sections, which should be
+// treated as individual members, like {a,{b,c},d}
+function parseCommaParts(str) {
+  if (!str)
+    return [''];
+
+  var parts = [];
+  var m = balanced('{', '}', str);
+
+  if (!m)
+    return str.split(',');
+
+  var pre = m.pre;
+  var body = m.body;
+  var post = m.post;
+  var p = pre.split(',');
+
+  p[p.length-1] += '{' + body + '}';
+  var postParts = parseCommaParts(post);
+  if (post.length) {
+    p[p.length-1] += postParts.shift();
+    p.push.apply(p, postParts);
+  }
+
+  parts.push.apply(parts, p);
+
+  return parts;
+}
+
+function expandTop(str) {
+  if (!str)
+    return [];
+
+  // I don't know why Bash 4.3 does this, but it does.
+  // Anything starting with {} will have the first two bytes preserved
+  // but *only* at the top level, so {},a}b will not expand to anything,
+  // but a{},b}c will be expanded to [a}c,abc].
+  // One could argue that this is a bug in Bash, but since the goal of
+  // this module is to match Bash's rules, we escape a leading {}
+  if (str.substr(0, 2) === '{}') {
+    str = '\\{\\}' + str.substr(2);
+  }
+
+  return expand(escapeBraces(str), true).map(unescapeBraces);
+}
+
+function identity(e) {
+  return e;
+}
+
+function embrace(str) {
+  return '{' + str + '}';
+}
+function isPadded(el) {
+  return /^-?0\d/.test(el);
+}
+
+function lte(i, y) {
+  return i <= y;
+}
+function gte(i, y) {
+  return i >= y;
+}
+
+function expand(str, isTop) {
+  var expansions = [];
+
+  var m = balanced('{', '}', str);
+  if (!m || /\$$/.test(m.pre)) return [str];
+
+  var isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body);
+  var isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body);
+  var isSequence = isNumericSequence || isAlphaSequence;
+  var isOptions = m.body.indexOf(',') >= 0;
+  if (!isSequence && !isOptions) {
+    // {a},b}
+    if (m.post.match(/,.*\}/)) {
+      str = m.pre + '{' + m.body + escClose + m.post;
+      return expand(str);
+    }
+    return [str];
+  }
+
+  var n;
+  if (isSequence) {
+    n = m.body.split(/\.\./);
+  } else {
+    n = parseCommaParts(m.body);
+    if (n.length === 1) {
+      // x{{a,b}}y ==> x{a}y x{b}y
+      n = expand(n[0], false).map(embrace);
+      if (n.length === 1) {
+        var post = m.post.length
+          ? expand(m.post, false)
+          : [''];
+        return post.map(function(p) {
+          return m.pre + n[0] + p;
+        });
+      }
+    }
+  }
+
+  // at this point, n is the parts, and we know it's not a comma set
+  // with a single entry.
+
+  // no need to expand pre, since it is guaranteed to be free of brace-sets
+  var pre = m.pre;
+  var post = m.post.length
+    ? expand(m.post, false)
+    : [''];
+
+  var N;
+
+  if (isSequence) {
+    var x = numeric(n[0]);
+    var y = numeric(n[1]);
+    var width = Math.max(n[0].length, n[1].length)
+    var incr = n.length == 3
+      ? Math.abs(numeric(n[2]))
+      : 1;
+    var test = lte;
+    var reverse = y < x;
+    if (reverse) {
+      incr *= -1;
+      test = gte;
+    }
+    var pad = n.some(isPadded);
+
+    N = [];
+
+    for (var i = x; test(i, y); i += incr) {
+      var c;
+      if (isAlphaSequence) {
+        c = String.fromCharCode(i);
+        if (c === '\\')
+          c = '';
+      } else {
+        c = String(i);
+        if (pad) {
+          var need = width - c.length;
+          if (need > 0) {
+            var z = new Array(need + 1).join('0');
+            if (i < 0)
+              c = '-' + z + c.slice(1);
+            else
+              c = z + c;
+          }
+        }
+      }
+      N.push(c);
+    }
+  } else {
+    N = concatMap(n, function(el) { return expand(el, false) });
+  }
+
+  for (var j = 0; j < N.length; j++) {
+    for (var k = 0; k < post.length; k++) {
+      var expansion = pre + N[j] + post[k];
+      if (!isTop || isSequence || expansion)
+        expansions.push(expansion);
+    }
+  }
+
+  return expansions;
+}
+
+
+
+/***/ }),
+
 /***/ 3463:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -49774,6 +43875,960 @@ function populateMaps (extensions, types) {
       types[extension] = type
     }
   })
+}
+
+
+/***/ }),
+
+/***/ 9566:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+module.exports = minimatch
+minimatch.Minimatch = Minimatch
+
+var path = (function () { try { return __nccwpck_require__(1017) } catch (e) {}}()) || {
+  sep: '/'
+}
+minimatch.sep = path.sep
+
+var GLOBSTAR = minimatch.GLOBSTAR = Minimatch.GLOBSTAR = {}
+var expand = __nccwpck_require__(3197)
+
+var plTypes = {
+  '!': { open: '(?:(?!(?:', close: '))[^/]*?)'},
+  '?': { open: '(?:', close: ')?' },
+  '+': { open: '(?:', close: ')+' },
+  '*': { open: '(?:', close: ')*' },
+  '@': { open: '(?:', close: ')' }
+}
+
+// any single thing other than /
+// don't need to escape / when using new RegExp()
+var qmark = '[^/]'
+
+// * => any number of characters
+var star = qmark + '*?'
+
+// ** when dots are allowed.  Anything goes, except .. and .
+// not (^ or / followed by one or two dots followed by $ or /),
+// followed by anything, any number of times.
+var twoStarDot = '(?:(?!(?:\\\/|^)(?:\\.{1,2})($|\\\/)).)*?'
+
+// not a ^ or / followed by a dot,
+// followed by anything, any number of times.
+var twoStarNoDot = '(?:(?!(?:\\\/|^)\\.).)*?'
+
+// characters that need to be escaped in RegExp.
+var reSpecials = charSet('().*{}+?[]^$\\!')
+
+// "abc" -> { a:true, b:true, c:true }
+function charSet (s) {
+  return s.split('').reduce(function (set, c) {
+    set[c] = true
+    return set
+  }, {})
+}
+
+// normalizes slashes.
+var slashSplit = /\/+/
+
+minimatch.filter = filter
+function filter (pattern, options) {
+  options = options || {}
+  return function (p, i, list) {
+    return minimatch(p, pattern, options)
+  }
+}
+
+function ext (a, b) {
+  b = b || {}
+  var t = {}
+  Object.keys(a).forEach(function (k) {
+    t[k] = a[k]
+  })
+  Object.keys(b).forEach(function (k) {
+    t[k] = b[k]
+  })
+  return t
+}
+
+minimatch.defaults = function (def) {
+  if (!def || typeof def !== 'object' || !Object.keys(def).length) {
+    return minimatch
+  }
+
+  var orig = minimatch
+
+  var m = function minimatch (p, pattern, options) {
+    return orig(p, pattern, ext(def, options))
+  }
+
+  m.Minimatch = function Minimatch (pattern, options) {
+    return new orig.Minimatch(pattern, ext(def, options))
+  }
+  m.Minimatch.defaults = function defaults (options) {
+    return orig.defaults(ext(def, options)).Minimatch
+  }
+
+  m.filter = function filter (pattern, options) {
+    return orig.filter(pattern, ext(def, options))
+  }
+
+  m.defaults = function defaults (options) {
+    return orig.defaults(ext(def, options))
+  }
+
+  m.makeRe = function makeRe (pattern, options) {
+    return orig.makeRe(pattern, ext(def, options))
+  }
+
+  m.braceExpand = function braceExpand (pattern, options) {
+    return orig.braceExpand(pattern, ext(def, options))
+  }
+
+  m.match = function (list, pattern, options) {
+    return orig.match(list, pattern, ext(def, options))
+  }
+
+  return m
+}
+
+Minimatch.defaults = function (def) {
+  return minimatch.defaults(def).Minimatch
+}
+
+function minimatch (p, pattern, options) {
+  assertValidPattern(pattern)
+
+  if (!options) options = {}
+
+  // shortcut: comments match nothing.
+  if (!options.nocomment && pattern.charAt(0) === '#') {
+    return false
+  }
+
+  return new Minimatch(pattern, options).match(p)
+}
+
+function Minimatch (pattern, options) {
+  if (!(this instanceof Minimatch)) {
+    return new Minimatch(pattern, options)
+  }
+
+  assertValidPattern(pattern)
+
+  if (!options) options = {}
+
+  pattern = pattern.trim()
+
+  // windows support: need to use /, not \
+  if (!options.allowWindowsEscape && path.sep !== '/') {
+    pattern = pattern.split(path.sep).join('/')
+  }
+
+  this.options = options
+  this.set = []
+  this.pattern = pattern
+  this.regexp = null
+  this.negate = false
+  this.comment = false
+  this.empty = false
+  this.partial = !!options.partial
+
+  // make the set of regexps etc.
+  this.make()
+}
+
+Minimatch.prototype.debug = function () {}
+
+Minimatch.prototype.make = make
+function make () {
+  var pattern = this.pattern
+  var options = this.options
+
+  // empty patterns and comments match nothing.
+  if (!options.nocomment && pattern.charAt(0) === '#') {
+    this.comment = true
+    return
+  }
+  if (!pattern) {
+    this.empty = true
+    return
+  }
+
+  // step 1: figure out negation, etc.
+  this.parseNegate()
+
+  // step 2: expand braces
+  var set = this.globSet = this.braceExpand()
+
+  if (options.debug) this.debug = function debug() { console.error.apply(console, arguments) }
+
+  this.debug(this.pattern, set)
+
+  // step 3: now we have a set, so turn each one into a series of path-portion
+  // matching patterns.
+  // These will be regexps, except in the case of "**", which is
+  // set to the GLOBSTAR object for globstar behavior,
+  // and will not contain any / characters
+  set = this.globParts = set.map(function (s) {
+    return s.split(slashSplit)
+  })
+
+  this.debug(this.pattern, set)
+
+  // glob --> regexps
+  set = set.map(function (s, si, set) {
+    return s.map(this.parse, this)
+  }, this)
+
+  this.debug(this.pattern, set)
+
+  // filter out everything that didn't compile properly.
+  set = set.filter(function (s) {
+    return s.indexOf(false) === -1
+  })
+
+  this.debug(this.pattern, set)
+
+  this.set = set
+}
+
+Minimatch.prototype.parseNegate = parseNegate
+function parseNegate () {
+  var pattern = this.pattern
+  var negate = false
+  var options = this.options
+  var negateOffset = 0
+
+  if (options.nonegate) return
+
+  for (var i = 0, l = pattern.length
+    ; i < l && pattern.charAt(i) === '!'
+    ; i++) {
+    negate = !negate
+    negateOffset++
+  }
+
+  if (negateOffset) this.pattern = pattern.substr(negateOffset)
+  this.negate = negate
+}
+
+// Brace expansion:
+// a{b,c}d -> abd acd
+// a{b,}c -> abc ac
+// a{0..3}d -> a0d a1d a2d a3d
+// a{b,c{d,e}f}g -> abg acdfg acefg
+// a{b,c}d{e,f}g -> abdeg acdeg abdeg abdfg
+//
+// Invalid sets are not expanded.
+// a{2..}b -> a{2..}b
+// a{b}c -> a{b}c
+minimatch.braceExpand = function (pattern, options) {
+  return braceExpand(pattern, options)
+}
+
+Minimatch.prototype.braceExpand = braceExpand
+
+function braceExpand (pattern, options) {
+  if (!options) {
+    if (this instanceof Minimatch) {
+      options = this.options
+    } else {
+      options = {}
+    }
+  }
+
+  pattern = typeof pattern === 'undefined'
+    ? this.pattern : pattern
+
+  assertValidPattern(pattern)
+
+  // Thanks to Yeting Li <https://github.com/yetingli> for
+  // improving this regexp to avoid a ReDOS vulnerability.
+  if (options.nobrace || !/\{(?:(?!\{).)*\}/.test(pattern)) {
+    // shortcut. no need to expand.
+    return [pattern]
+  }
+
+  return expand(pattern)
+}
+
+var MAX_PATTERN_LENGTH = 1024 * 64
+var assertValidPattern = function (pattern) {
+  if (typeof pattern !== 'string') {
+    throw new TypeError('invalid pattern')
+  }
+
+  if (pattern.length > MAX_PATTERN_LENGTH) {
+    throw new TypeError('pattern is too long')
+  }
+}
+
+// parse a component of the expanded set.
+// At this point, no pattern may contain "/" in it
+// so we're going to return a 2d array, where each entry is the full
+// pattern, split on '/', and then turned into a regular expression.
+// A regexp is made at the end which joins each array with an
+// escaped /, and another full one which joins each regexp with |.
+//
+// Following the lead of Bash 4.1, note that "**" only has special meaning
+// when it is the *only* thing in a path portion.  Otherwise, any series
+// of * is equivalent to a single *.  Globstar behavior is enabled by
+// default, and can be disabled by setting options.noglobstar.
+Minimatch.prototype.parse = parse
+var SUBPARSE = {}
+function parse (pattern, isSub) {
+  assertValidPattern(pattern)
+
+  var options = this.options
+
+  // shortcuts
+  if (pattern === '**') {
+    if (!options.noglobstar)
+      return GLOBSTAR
+    else
+      pattern = '*'
+  }
+  if (pattern === '') return ''
+
+  var re = ''
+  var hasMagic = !!options.nocase
+  var escaping = false
+  // ? => one single character
+  var patternListStack = []
+  var negativeLists = []
+  var stateChar
+  var inClass = false
+  var reClassStart = -1
+  var classStart = -1
+  // . and .. never match anything that doesn't start with .,
+  // even when options.dot is set.
+  var patternStart = pattern.charAt(0) === '.' ? '' // anything
+  // not (start or / followed by . or .. followed by / or end)
+  : options.dot ? '(?!(?:^|\\\/)\\.{1,2}(?:$|\\\/))'
+  : '(?!\\.)'
+  var self = this
+
+  function clearStateChar () {
+    if (stateChar) {
+      // we had some state-tracking character
+      // that wasn't consumed by this pass.
+      switch (stateChar) {
+        case '*':
+          re += star
+          hasMagic = true
+        break
+        case '?':
+          re += qmark
+          hasMagic = true
+        break
+        default:
+          re += '\\' + stateChar
+        break
+      }
+      self.debug('clearStateChar %j %j', stateChar, re)
+      stateChar = false
+    }
+  }
+
+  for (var i = 0, len = pattern.length, c
+    ; (i < len) && (c = pattern.charAt(i))
+    ; i++) {
+    this.debug('%s\t%s %s %j', pattern, i, re, c)
+
+    // skip over any that are escaped.
+    if (escaping && reSpecials[c]) {
+      re += '\\' + c
+      escaping = false
+      continue
+    }
+
+    switch (c) {
+      /* istanbul ignore next */
+      case '/': {
+        // completely not allowed, even escaped.
+        // Should already be path-split by now.
+        return false
+      }
+
+      case '\\':
+        clearStateChar()
+        escaping = true
+      continue
+
+      // the various stateChar values
+      // for the "extglob" stuff.
+      case '?':
+      case '*':
+      case '+':
+      case '@':
+      case '!':
+        this.debug('%s\t%s %s %j <-- stateChar', pattern, i, re, c)
+
+        // all of those are literals inside a class, except that
+        // the glob [!a] means [^a] in regexp
+        if (inClass) {
+          this.debug('  in class')
+          if (c === '!' && i === classStart + 1) c = '^'
+          re += c
+          continue
+        }
+
+        // if we already have a stateChar, then it means
+        // that there was something like ** or +? in there.
+        // Handle the stateChar, then proceed with this one.
+        self.debug('call clearStateChar %j', stateChar)
+        clearStateChar()
+        stateChar = c
+        // if extglob is disabled, then +(asdf|foo) isn't a thing.
+        // just clear the statechar *now*, rather than even diving into
+        // the patternList stuff.
+        if (options.noext) clearStateChar()
+      continue
+
+      case '(':
+        if (inClass) {
+          re += '('
+          continue
+        }
+
+        if (!stateChar) {
+          re += '\\('
+          continue
+        }
+
+        patternListStack.push({
+          type: stateChar,
+          start: i - 1,
+          reStart: re.length,
+          open: plTypes[stateChar].open,
+          close: plTypes[stateChar].close
+        })
+        // negation is (?:(?!js)[^/]*)
+        re += stateChar === '!' ? '(?:(?!(?:' : '(?:'
+        this.debug('plType %j %j', stateChar, re)
+        stateChar = false
+      continue
+
+      case ')':
+        if (inClass || !patternListStack.length) {
+          re += '\\)'
+          continue
+        }
+
+        clearStateChar()
+        hasMagic = true
+        var pl = patternListStack.pop()
+        // negation is (?:(?!js)[^/]*)
+        // The others are (?:<pattern>)<type>
+        re += pl.close
+        if (pl.type === '!') {
+          negativeLists.push(pl)
+        }
+        pl.reEnd = re.length
+      continue
+
+      case '|':
+        if (inClass || !patternListStack.length || escaping) {
+          re += '\\|'
+          escaping = false
+          continue
+        }
+
+        clearStateChar()
+        re += '|'
+      continue
+
+      // these are mostly the same in regexp and glob
+      case '[':
+        // swallow any state-tracking char before the [
+        clearStateChar()
+
+        if (inClass) {
+          re += '\\' + c
+          continue
+        }
+
+        inClass = true
+        classStart = i
+        reClassStart = re.length
+        re += c
+      continue
+
+      case ']':
+        //  a right bracket shall lose its special
+        //  meaning and represent itself in
+        //  a bracket expression if it occurs
+        //  first in the list.  -- POSIX.2 2.8.3.2
+        if (i === classStart + 1 || !inClass) {
+          re += '\\' + c
+          escaping = false
+          continue
+        }
+
+        // handle the case where we left a class open.
+        // "[z-a]" is valid, equivalent to "\[z-a\]"
+        // split where the last [ was, make sure we don't have
+        // an invalid re. if so, re-walk the contents of the
+        // would-be class to re-translate any characters that
+        // were passed through as-is
+        // TODO: It would probably be faster to determine this
+        // without a try/catch and a new RegExp, but it's tricky
+        // to do safely.  For now, this is safe and works.
+        var cs = pattern.substring(classStart + 1, i)
+        try {
+          RegExp('[' + cs + ']')
+        } catch (er) {
+          // not a valid class!
+          var sp = this.parse(cs, SUBPARSE)
+          re = re.substr(0, reClassStart) + '\\[' + sp[0] + '\\]'
+          hasMagic = hasMagic || sp[1]
+          inClass = false
+          continue
+        }
+
+        // finish up the class.
+        hasMagic = true
+        inClass = false
+        re += c
+      continue
+
+      default:
+        // swallow any state char that wasn't consumed
+        clearStateChar()
+
+        if (escaping) {
+          // no need
+          escaping = false
+        } else if (reSpecials[c]
+          && !(c === '^' && inClass)) {
+          re += '\\'
+        }
+
+        re += c
+
+    } // switch
+  } // for
+
+  // handle the case where we left a class open.
+  // "[abc" is valid, equivalent to "\[abc"
+  if (inClass) {
+    // split where the last [ was, and escape it
+    // this is a huge pita.  We now have to re-walk
+    // the contents of the would-be class to re-translate
+    // any characters that were passed through as-is
+    cs = pattern.substr(classStart + 1)
+    sp = this.parse(cs, SUBPARSE)
+    re = re.substr(0, reClassStart) + '\\[' + sp[0]
+    hasMagic = hasMagic || sp[1]
+  }
+
+  // handle the case where we had a +( thing at the *end*
+  // of the pattern.
+  // each pattern list stack adds 3 chars, and we need to go through
+  // and escape any | chars that were passed through as-is for the regexp.
+  // Go through and escape them, taking care not to double-escape any
+  // | chars that were already escaped.
+  for (pl = patternListStack.pop(); pl; pl = patternListStack.pop()) {
+    var tail = re.slice(pl.reStart + pl.open.length)
+    this.debug('setting tail', re, pl)
+    // maybe some even number of \, then maybe 1 \, followed by a |
+    tail = tail.replace(/((?:\\{2}){0,64})(\\?)\|/g, function (_, $1, $2) {
+      if (!$2) {
+        // the | isn't already escaped, so escape it.
+        $2 = '\\'
+      }
+
+      // need to escape all those slashes *again*, without escaping the
+      // one that we need for escaping the | character.  As it works out,
+      // escaping an even number of slashes can be done by simply repeating
+      // it exactly after itself.  That's why this trick works.
+      //
+      // I am sorry that you have to see this.
+      return $1 + $1 + $2 + '|'
+    })
+
+    this.debug('tail=%j\n   %s', tail, tail, pl, re)
+    var t = pl.type === '*' ? star
+      : pl.type === '?' ? qmark
+      : '\\' + pl.type
+
+    hasMagic = true
+    re = re.slice(0, pl.reStart) + t + '\\(' + tail
+  }
+
+  // handle trailing things that only matter at the very end.
+  clearStateChar()
+  if (escaping) {
+    // trailing \\
+    re += '\\\\'
+  }
+
+  // only need to apply the nodot start if the re starts with
+  // something that could conceivably capture a dot
+  var addPatternStart = false
+  switch (re.charAt(0)) {
+    case '[': case '.': case '(': addPatternStart = true
+  }
+
+  // Hack to work around lack of negative lookbehind in JS
+  // A pattern like: *.!(x).!(y|z) needs to ensure that a name
+  // like 'a.xyz.yz' doesn't match.  So, the first negative
+  // lookahead, has to look ALL the way ahead, to the end of
+  // the pattern.
+  for (var n = negativeLists.length - 1; n > -1; n--) {
+    var nl = negativeLists[n]
+
+    var nlBefore = re.slice(0, nl.reStart)
+    var nlFirst = re.slice(nl.reStart, nl.reEnd - 8)
+    var nlLast = re.slice(nl.reEnd - 8, nl.reEnd)
+    var nlAfter = re.slice(nl.reEnd)
+
+    nlLast += nlAfter
+
+    // Handle nested stuff like *(*.js|!(*.json)), where open parens
+    // mean that we should *not* include the ) in the bit that is considered
+    // "after" the negated section.
+    var openParensBefore = nlBefore.split('(').length - 1
+    var cleanAfter = nlAfter
+    for (i = 0; i < openParensBefore; i++) {
+      cleanAfter = cleanAfter.replace(/\)[+*?]?/, '')
+    }
+    nlAfter = cleanAfter
+
+    var dollar = ''
+    if (nlAfter === '' && isSub !== SUBPARSE) {
+      dollar = '$'
+    }
+    var newRe = nlBefore + nlFirst + nlAfter + dollar + nlLast
+    re = newRe
+  }
+
+  // if the re is not "" at this point, then we need to make sure
+  // it doesn't match against an empty path part.
+  // Otherwise a/* will match a/, which it should not.
+  if (re !== '' && hasMagic) {
+    re = '(?=.)' + re
+  }
+
+  if (addPatternStart) {
+    re = patternStart + re
+  }
+
+  // parsing just a piece of a larger pattern.
+  if (isSub === SUBPARSE) {
+    return [re, hasMagic]
+  }
+
+  // skip the regexp for non-magical patterns
+  // unescape anything in it, though, so that it'll be
+  // an exact match against a file etc.
+  if (!hasMagic) {
+    return globUnescape(pattern)
+  }
+
+  var flags = options.nocase ? 'i' : ''
+  try {
+    var regExp = new RegExp('^' + re + '$', flags)
+  } catch (er) /* istanbul ignore next - should be impossible */ {
+    // If it was an invalid regular expression, then it can't match
+    // anything.  This trick looks for a character after the end of
+    // the string, which is of course impossible, except in multi-line
+    // mode, but it's not a /m regex.
+    return new RegExp('$.')
+  }
+
+  regExp._glob = pattern
+  regExp._src = re
+
+  return regExp
+}
+
+minimatch.makeRe = function (pattern, options) {
+  return new Minimatch(pattern, options || {}).makeRe()
+}
+
+Minimatch.prototype.makeRe = makeRe
+function makeRe () {
+  if (this.regexp || this.regexp === false) return this.regexp
+
+  // at this point, this.set is a 2d array of partial
+  // pattern strings, or "**".
+  //
+  // It's better to use .match().  This function shouldn't
+  // be used, really, but it's pretty convenient sometimes,
+  // when you just want to work with a regex.
+  var set = this.set
+
+  if (!set.length) {
+    this.regexp = false
+    return this.regexp
+  }
+  var options = this.options
+
+  var twoStar = options.noglobstar ? star
+    : options.dot ? twoStarDot
+    : twoStarNoDot
+  var flags = options.nocase ? 'i' : ''
+
+  var re = set.map(function (pattern) {
+    return pattern.map(function (p) {
+      return (p === GLOBSTAR) ? twoStar
+      : (typeof p === 'string') ? regExpEscape(p)
+      : p._src
+    }).join('\\\/')
+  }).join('|')
+
+  // must match entire pattern
+  // ending in a * or ** will make it less strict.
+  re = '^(?:' + re + ')$'
+
+  // can match anything, as long as it's not this.
+  if (this.negate) re = '^(?!' + re + ').*$'
+
+  try {
+    this.regexp = new RegExp(re, flags)
+  } catch (ex) /* istanbul ignore next - should be impossible */ {
+    this.regexp = false
+  }
+  return this.regexp
+}
+
+minimatch.match = function (list, pattern, options) {
+  options = options || {}
+  var mm = new Minimatch(pattern, options)
+  list = list.filter(function (f) {
+    return mm.match(f)
+  })
+  if (mm.options.nonull && !list.length) {
+    list.push(pattern)
+  }
+  return list
+}
+
+Minimatch.prototype.match = function match (f, partial) {
+  if (typeof partial === 'undefined') partial = this.partial
+  this.debug('match', f, this.pattern)
+  // short-circuit in the case of busted things.
+  // comments, etc.
+  if (this.comment) return false
+  if (this.empty) return f === ''
+
+  if (f === '/' && partial) return true
+
+  var options = this.options
+
+  // windows: need to use /, not \
+  if (path.sep !== '/') {
+    f = f.split(path.sep).join('/')
+  }
+
+  // treat the test path as a set of pathparts.
+  f = f.split(slashSplit)
+  this.debug(this.pattern, 'split', f)
+
+  // just ONE of the pattern sets in this.set needs to match
+  // in order for it to be valid.  If negating, then just one
+  // match means that we have failed.
+  // Either way, return on the first hit.
+
+  var set = this.set
+  this.debug(this.pattern, 'set', set)
+
+  // Find the basename of the path by looking for the last non-empty segment
+  var filename
+  var i
+  for (i = f.length - 1; i >= 0; i--) {
+    filename = f[i]
+    if (filename) break
+  }
+
+  for (i = 0; i < set.length; i++) {
+    var pattern = set[i]
+    var file = f
+    if (options.matchBase && pattern.length === 1) {
+      file = [filename]
+    }
+    var hit = this.matchOne(file, pattern, partial)
+    if (hit) {
+      if (options.flipNegate) return true
+      return !this.negate
+    }
+  }
+
+  // didn't get any hits.  this is success if it's a negative
+  // pattern, failure otherwise.
+  if (options.flipNegate) return false
+  return this.negate
+}
+
+// set partial to true to test if, for example,
+// "/a/b" matches the start of "/*/b/*/d"
+// Partial means, if you run out of file before you run
+// out of pattern, then that's fine, as long as all
+// the parts match.
+Minimatch.prototype.matchOne = function (file, pattern, partial) {
+  var options = this.options
+
+  this.debug('matchOne',
+    { 'this': this, file: file, pattern: pattern })
+
+  this.debug('matchOne', file.length, pattern.length)
+
+  for (var fi = 0,
+      pi = 0,
+      fl = file.length,
+      pl = pattern.length
+      ; (fi < fl) && (pi < pl)
+      ; fi++, pi++) {
+    this.debug('matchOne loop')
+    var p = pattern[pi]
+    var f = file[fi]
+
+    this.debug(pattern, p, f)
+
+    // should be impossible.
+    // some invalid regexp stuff in the set.
+    /* istanbul ignore if */
+    if (p === false) return false
+
+    if (p === GLOBSTAR) {
+      this.debug('GLOBSTAR', [pattern, p, f])
+
+      // "**"
+      // a/**/b/**/c would match the following:
+      // a/b/x/y/z/c
+      // a/x/y/z/b/c
+      // a/b/x/b/x/c
+      // a/b/c
+      // To do this, take the rest of the pattern after
+      // the **, and see if it would match the file remainder.
+      // If so, return success.
+      // If not, the ** "swallows" a segment, and try again.
+      // This is recursively awful.
+      //
+      // a/**/b/**/c matching a/b/x/y/z/c
+      // - a matches a
+      // - doublestar
+      //   - matchOne(b/x/y/z/c, b/**/c)
+      //     - b matches b
+      //     - doublestar
+      //       - matchOne(x/y/z/c, c) -> no
+      //       - matchOne(y/z/c, c) -> no
+      //       - matchOne(z/c, c) -> no
+      //       - matchOne(c, c) yes, hit
+      var fr = fi
+      var pr = pi + 1
+      if (pr === pl) {
+        this.debug('** at the end')
+        // a ** at the end will just swallow the rest.
+        // We have found a match.
+        // however, it will not swallow /.x, unless
+        // options.dot is set.
+        // . and .. are *never* matched by **, for explosively
+        // exponential reasons.
+        for (; fi < fl; fi++) {
+          if (file[fi] === '.' || file[fi] === '..' ||
+            (!options.dot && file[fi].charAt(0) === '.')) return false
+        }
+        return true
+      }
+
+      // ok, let's see if we can swallow whatever we can.
+      while (fr < fl) {
+        var swallowee = file[fr]
+
+        this.debug('\nglobstar while', file, fr, pattern, pr, swallowee)
+
+        // XXX remove this slice.  Just pass the start index.
+        if (this.matchOne(file.slice(fr), pattern.slice(pr), partial)) {
+          this.debug('globstar found match!', fr, fl, swallowee)
+          // found a match.
+          return true
+        } else {
+          // can't swallow "." or ".." ever.
+          // can only swallow ".foo" when explicitly asked.
+          if (swallowee === '.' || swallowee === '..' ||
+            (!options.dot && swallowee.charAt(0) === '.')) {
+            this.debug('dot detected!', file, fr, pattern, pr)
+            break
+          }
+
+          // ** swallows a segment, and continue.
+          this.debug('globstar swallow a segment, and continue')
+          fr++
+        }
+      }
+
+      // no match was found.
+      // However, in partial mode, we can't say this is necessarily over.
+      // If there's more *pattern* left, then
+      /* istanbul ignore if */
+      if (partial) {
+        // ran out of file
+        this.debug('\n>>> no match, partial?', file, fr, pattern, pr)
+        if (fr === fl) return true
+      }
+      return false
+    }
+
+    // something other than **
+    // non-magic patterns just have to match exactly
+    // patterns with magic have been turned into regexps.
+    var hit
+    if (typeof p === 'string') {
+      hit = f === p
+      this.debug('string match', p, f, hit)
+    } else {
+      hit = f.match(p)
+      this.debug('pattern match', p, f, hit)
+    }
+
+    if (!hit) return false
+  }
+
+  // Note: ending in / means that we'll get a final ""
+  // at the end of the pattern.  This can only match a
+  // corresponding "" at the end of the file.
+  // If the file ends in /, then it can only match a
+  // a pattern that ends in /, unless the pattern just
+  // doesn't have any more for it. But, a/b/ should *not*
+  // match "a/b/*", even though "" matches against the
+  // [^/]*? pattern, except in partial mode, where it might
+  // simply not be reached yet.
+  // However, a/b/ should still satisfy a/*
+
+  // now either we fell off the end of the pattern, or we're done.
+  if (fi === fl && pi === pl) {
+    // ran out of pattern and filename at the same time.
+    // an exact hit!
+    return true
+  } else if (fi === fl) {
+    // ran out of file, but still had pattern left.
+    // this is ok if we're doing the match as part of
+    // a glob fs traversal.
+    return partial
+  } else /* istanbul ignore else */ if (pi === pl) {
+    // ran out of pattern, still have file left.
+    // this is only acceptable if we're on the very last
+    // empty segment of a file with a trailing slash.
+    // a/* should match a/b/
+    return (fi === fl - 1) && (file[fi] === '')
+  }
+
+  // should be unreachable.
+  /* istanbul ignore next */
+  throw new Error('wtf?')
+}
+
+// replace stuff like \* with *
+function globUnescape (s) {
+  return s.replace(/\\(.)/g, '$1')
+}
+
+function regExpEscape (s) {
+  return s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
 }
 
 
@@ -53151,6 +48206,1656 @@ exports.AbortError = AbortError;
     }())
   }
 })( false ? 0 : exports)
+
+
+/***/ }),
+
+/***/ 4800:
+/***/ ((module, exports) => {
+
+exports = module.exports = SemVer
+
+var debug
+/* istanbul ignore next */
+if (typeof process === 'object' &&
+    process.env &&
+    process.env.NODE_DEBUG &&
+    /\bsemver\b/i.test(process.env.NODE_DEBUG)) {
+  debug = function () {
+    var args = Array.prototype.slice.call(arguments, 0)
+    args.unshift('SEMVER')
+    console.log.apply(console, args)
+  }
+} else {
+  debug = function () {}
+}
+
+// Note: this is the semver.org version of the spec that it implements
+// Not necessarily the package version of this code.
+exports.SEMVER_SPEC_VERSION = '2.0.0'
+
+var MAX_LENGTH = 256
+var MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER ||
+  /* istanbul ignore next */ 9007199254740991
+
+// Max safe segment length for coercion.
+var MAX_SAFE_COMPONENT_LENGTH = 16
+
+var MAX_SAFE_BUILD_LENGTH = MAX_LENGTH - 6
+
+// The actual regexps go on exports.re
+var re = exports.re = []
+var safeRe = exports.safeRe = []
+var src = exports.src = []
+var t = exports.tokens = {}
+var R = 0
+
+function tok (n) {
+  t[n] = R++
+}
+
+var LETTERDASHNUMBER = '[a-zA-Z0-9-]'
+
+// Replace some greedy regex tokens to prevent regex dos issues. These regex are
+// used internally via the safeRe object since all inputs in this library get
+// normalized first to trim and collapse all extra whitespace. The original
+// regexes are exported for userland consumption and lower level usage. A
+// future breaking change could export the safer regex only with a note that
+// all input should have extra whitespace removed.
+var safeRegexReplacements = [
+  ['\\s', 1],
+  ['\\d', MAX_LENGTH],
+  [LETTERDASHNUMBER, MAX_SAFE_BUILD_LENGTH],
+]
+
+function makeSafeRe (value) {
+  for (var i = 0; i < safeRegexReplacements.length; i++) {
+    var token = safeRegexReplacements[i][0]
+    var max = safeRegexReplacements[i][1]
+    value = value
+      .split(token + '*').join(token + '{0,' + max + '}')
+      .split(token + '+').join(token + '{1,' + max + '}')
+  }
+  return value
+}
+
+// The following Regular Expressions can be used for tokenizing,
+// validating, and parsing SemVer version strings.
+
+// ## Numeric Identifier
+// A single `0`, or a non-zero digit followed by zero or more digits.
+
+tok('NUMERICIDENTIFIER')
+src[t.NUMERICIDENTIFIER] = '0|[1-9]\\d*'
+tok('NUMERICIDENTIFIERLOOSE')
+src[t.NUMERICIDENTIFIERLOOSE] = '\\d+'
+
+// ## Non-numeric Identifier
+// Zero or more digits, followed by a letter or hyphen, and then zero or
+// more letters, digits, or hyphens.
+
+tok('NONNUMERICIDENTIFIER')
+src[t.NONNUMERICIDENTIFIER] = '\\d*[a-zA-Z-]' + LETTERDASHNUMBER + '*'
+
+// ## Main Version
+// Three dot-separated numeric identifiers.
+
+tok('MAINVERSION')
+src[t.MAINVERSION] = '(' + src[t.NUMERICIDENTIFIER] + ')\\.' +
+                   '(' + src[t.NUMERICIDENTIFIER] + ')\\.' +
+                   '(' + src[t.NUMERICIDENTIFIER] + ')'
+
+tok('MAINVERSIONLOOSE')
+src[t.MAINVERSIONLOOSE] = '(' + src[t.NUMERICIDENTIFIERLOOSE] + ')\\.' +
+                        '(' + src[t.NUMERICIDENTIFIERLOOSE] + ')\\.' +
+                        '(' + src[t.NUMERICIDENTIFIERLOOSE] + ')'
+
+// ## Pre-release Version Identifier
+// A numeric identifier, or a non-numeric identifier.
+
+tok('PRERELEASEIDENTIFIER')
+src[t.PRERELEASEIDENTIFIER] = '(?:' + src[t.NUMERICIDENTIFIER] +
+                            '|' + src[t.NONNUMERICIDENTIFIER] + ')'
+
+tok('PRERELEASEIDENTIFIERLOOSE')
+src[t.PRERELEASEIDENTIFIERLOOSE] = '(?:' + src[t.NUMERICIDENTIFIERLOOSE] +
+                                 '|' + src[t.NONNUMERICIDENTIFIER] + ')'
+
+// ## Pre-release Version
+// Hyphen, followed by one or more dot-separated pre-release version
+// identifiers.
+
+tok('PRERELEASE')
+src[t.PRERELEASE] = '(?:-(' + src[t.PRERELEASEIDENTIFIER] +
+                  '(?:\\.' + src[t.PRERELEASEIDENTIFIER] + ')*))'
+
+tok('PRERELEASELOOSE')
+src[t.PRERELEASELOOSE] = '(?:-?(' + src[t.PRERELEASEIDENTIFIERLOOSE] +
+                       '(?:\\.' + src[t.PRERELEASEIDENTIFIERLOOSE] + ')*))'
+
+// ## Build Metadata Identifier
+// Any combination of digits, letters, or hyphens.
+
+tok('BUILDIDENTIFIER')
+src[t.BUILDIDENTIFIER] = LETTERDASHNUMBER + '+'
+
+// ## Build Metadata
+// Plus sign, followed by one or more period-separated build metadata
+// identifiers.
+
+tok('BUILD')
+src[t.BUILD] = '(?:\\+(' + src[t.BUILDIDENTIFIER] +
+             '(?:\\.' + src[t.BUILDIDENTIFIER] + ')*))'
+
+// ## Full Version String
+// A main version, followed optionally by a pre-release version and
+// build metadata.
+
+// Note that the only major, minor, patch, and pre-release sections of
+// the version string are capturing groups.  The build metadata is not a
+// capturing group, because it should not ever be used in version
+// comparison.
+
+tok('FULL')
+tok('FULLPLAIN')
+src[t.FULLPLAIN] = 'v?' + src[t.MAINVERSION] +
+                  src[t.PRERELEASE] + '?' +
+                  src[t.BUILD] + '?'
+
+src[t.FULL] = '^' + src[t.FULLPLAIN] + '$'
+
+// like full, but allows v1.2.3 and =1.2.3, which people do sometimes.
+// also, 1.0.0alpha1 (prerelease without the hyphen) which is pretty
+// common in the npm registry.
+tok('LOOSEPLAIN')
+src[t.LOOSEPLAIN] = '[v=\\s]*' + src[t.MAINVERSIONLOOSE] +
+                  src[t.PRERELEASELOOSE] + '?' +
+                  src[t.BUILD] + '?'
+
+tok('LOOSE')
+src[t.LOOSE] = '^' + src[t.LOOSEPLAIN] + '$'
+
+tok('GTLT')
+src[t.GTLT] = '((?:<|>)?=?)'
+
+// Something like "2.*" or "1.2.x".
+// Note that "x.x" is a valid xRange identifer, meaning "any version"
+// Only the first item is strictly required.
+tok('XRANGEIDENTIFIERLOOSE')
+src[t.XRANGEIDENTIFIERLOOSE] = src[t.NUMERICIDENTIFIERLOOSE] + '|x|X|\\*'
+tok('XRANGEIDENTIFIER')
+src[t.XRANGEIDENTIFIER] = src[t.NUMERICIDENTIFIER] + '|x|X|\\*'
+
+tok('XRANGEPLAIN')
+src[t.XRANGEPLAIN] = '[v=\\s]*(' + src[t.XRANGEIDENTIFIER] + ')' +
+                   '(?:\\.(' + src[t.XRANGEIDENTIFIER] + ')' +
+                   '(?:\\.(' + src[t.XRANGEIDENTIFIER] + ')' +
+                   '(?:' + src[t.PRERELEASE] + ')?' +
+                   src[t.BUILD] + '?' +
+                   ')?)?'
+
+tok('XRANGEPLAINLOOSE')
+src[t.XRANGEPLAINLOOSE] = '[v=\\s]*(' + src[t.XRANGEIDENTIFIERLOOSE] + ')' +
+                        '(?:\\.(' + src[t.XRANGEIDENTIFIERLOOSE] + ')' +
+                        '(?:\\.(' + src[t.XRANGEIDENTIFIERLOOSE] + ')' +
+                        '(?:' + src[t.PRERELEASELOOSE] + ')?' +
+                        src[t.BUILD] + '?' +
+                        ')?)?'
+
+tok('XRANGE')
+src[t.XRANGE] = '^' + src[t.GTLT] + '\\s*' + src[t.XRANGEPLAIN] + '$'
+tok('XRANGELOOSE')
+src[t.XRANGELOOSE] = '^' + src[t.GTLT] + '\\s*' + src[t.XRANGEPLAINLOOSE] + '$'
+
+// Coercion.
+// Extract anything that could conceivably be a part of a valid semver
+tok('COERCE')
+src[t.COERCE] = '(^|[^\\d])' +
+              '(\\d{1,' + MAX_SAFE_COMPONENT_LENGTH + '})' +
+              '(?:\\.(\\d{1,' + MAX_SAFE_COMPONENT_LENGTH + '}))?' +
+              '(?:\\.(\\d{1,' + MAX_SAFE_COMPONENT_LENGTH + '}))?' +
+              '(?:$|[^\\d])'
+tok('COERCERTL')
+re[t.COERCERTL] = new RegExp(src[t.COERCE], 'g')
+safeRe[t.COERCERTL] = new RegExp(makeSafeRe(src[t.COERCE]), 'g')
+
+// Tilde ranges.
+// Meaning is "reasonably at or greater than"
+tok('LONETILDE')
+src[t.LONETILDE] = '(?:~>?)'
+
+tok('TILDETRIM')
+src[t.TILDETRIM] = '(\\s*)' + src[t.LONETILDE] + '\\s+'
+re[t.TILDETRIM] = new RegExp(src[t.TILDETRIM], 'g')
+safeRe[t.TILDETRIM] = new RegExp(makeSafeRe(src[t.TILDETRIM]), 'g')
+var tildeTrimReplace = '$1~'
+
+tok('TILDE')
+src[t.TILDE] = '^' + src[t.LONETILDE] + src[t.XRANGEPLAIN] + '$'
+tok('TILDELOOSE')
+src[t.TILDELOOSE] = '^' + src[t.LONETILDE] + src[t.XRANGEPLAINLOOSE] + '$'
+
+// Caret ranges.
+// Meaning is "at least and backwards compatible with"
+tok('LONECARET')
+src[t.LONECARET] = '(?:\\^)'
+
+tok('CARETTRIM')
+src[t.CARETTRIM] = '(\\s*)' + src[t.LONECARET] + '\\s+'
+re[t.CARETTRIM] = new RegExp(src[t.CARETTRIM], 'g')
+safeRe[t.CARETTRIM] = new RegExp(makeSafeRe(src[t.CARETTRIM]), 'g')
+var caretTrimReplace = '$1^'
+
+tok('CARET')
+src[t.CARET] = '^' + src[t.LONECARET] + src[t.XRANGEPLAIN] + '$'
+tok('CARETLOOSE')
+src[t.CARETLOOSE] = '^' + src[t.LONECARET] + src[t.XRANGEPLAINLOOSE] + '$'
+
+// A simple gt/lt/eq thing, or just "" to indicate "any version"
+tok('COMPARATORLOOSE')
+src[t.COMPARATORLOOSE] = '^' + src[t.GTLT] + '\\s*(' + src[t.LOOSEPLAIN] + ')$|^$'
+tok('COMPARATOR')
+src[t.COMPARATOR] = '^' + src[t.GTLT] + '\\s*(' + src[t.FULLPLAIN] + ')$|^$'
+
+// An expression to strip any whitespace between the gtlt and the thing
+// it modifies, so that `> 1.2.3` ==> `>1.2.3`
+tok('COMPARATORTRIM')
+src[t.COMPARATORTRIM] = '(\\s*)' + src[t.GTLT] +
+                      '\\s*(' + src[t.LOOSEPLAIN] + '|' + src[t.XRANGEPLAIN] + ')'
+
+// this one has to use the /g flag
+re[t.COMPARATORTRIM] = new RegExp(src[t.COMPARATORTRIM], 'g')
+safeRe[t.COMPARATORTRIM] = new RegExp(makeSafeRe(src[t.COMPARATORTRIM]), 'g')
+var comparatorTrimReplace = '$1$2$3'
+
+// Something like `1.2.3 - 1.2.4`
+// Note that these all use the loose form, because they'll be
+// checked against either the strict or loose comparator form
+// later.
+tok('HYPHENRANGE')
+src[t.HYPHENRANGE] = '^\\s*(' + src[t.XRANGEPLAIN] + ')' +
+                   '\\s+-\\s+' +
+                   '(' + src[t.XRANGEPLAIN] + ')' +
+                   '\\s*$'
+
+tok('HYPHENRANGELOOSE')
+src[t.HYPHENRANGELOOSE] = '^\\s*(' + src[t.XRANGEPLAINLOOSE] + ')' +
+                        '\\s+-\\s+' +
+                        '(' + src[t.XRANGEPLAINLOOSE] + ')' +
+                        '\\s*$'
+
+// Star ranges basically just allow anything at all.
+tok('STAR')
+src[t.STAR] = '(<|>)?=?\\s*\\*'
+
+// Compile to actual regexp objects.
+// All are flag-free, unless they were created above with a flag.
+for (var i = 0; i < R; i++) {
+  debug(i, src[i])
+  if (!re[i]) {
+    re[i] = new RegExp(src[i])
+
+    // Replace all greedy whitespace to prevent regex dos issues. These regex are
+    // used internally via the safeRe object since all inputs in this library get
+    // normalized first to trim and collapse all extra whitespace. The original
+    // regexes are exported for userland consumption and lower level usage. A
+    // future breaking change could export the safer regex only with a note that
+    // all input should have extra whitespace removed.
+    safeRe[i] = new RegExp(makeSafeRe(src[i]))
+  }
+}
+
+exports.parse = parse
+function parse (version, options) {
+  if (!options || typeof options !== 'object') {
+    options = {
+      loose: !!options,
+      includePrerelease: false
+    }
+  }
+
+  if (version instanceof SemVer) {
+    return version
+  }
+
+  if (typeof version !== 'string') {
+    return null
+  }
+
+  if (version.length > MAX_LENGTH) {
+    return null
+  }
+
+  var r = options.loose ? safeRe[t.LOOSE] : safeRe[t.FULL]
+  if (!r.test(version)) {
+    return null
+  }
+
+  try {
+    return new SemVer(version, options)
+  } catch (er) {
+    return null
+  }
+}
+
+exports.valid = valid
+function valid (version, options) {
+  var v = parse(version, options)
+  return v ? v.version : null
+}
+
+exports.clean = clean
+function clean (version, options) {
+  var s = parse(version.trim().replace(/^[=v]+/, ''), options)
+  return s ? s.version : null
+}
+
+exports.SemVer = SemVer
+
+function SemVer (version, options) {
+  if (!options || typeof options !== 'object') {
+    options = {
+      loose: !!options,
+      includePrerelease: false
+    }
+  }
+  if (version instanceof SemVer) {
+    if (version.loose === options.loose) {
+      return version
+    } else {
+      version = version.version
+    }
+  } else if (typeof version !== 'string') {
+    throw new TypeError('Invalid Version: ' + version)
+  }
+
+  if (version.length > MAX_LENGTH) {
+    throw new TypeError('version is longer than ' + MAX_LENGTH + ' characters')
+  }
+
+  if (!(this instanceof SemVer)) {
+    return new SemVer(version, options)
+  }
+
+  debug('SemVer', version, options)
+  this.options = options
+  this.loose = !!options.loose
+
+  var m = version.trim().match(options.loose ? safeRe[t.LOOSE] : safeRe[t.FULL])
+
+  if (!m) {
+    throw new TypeError('Invalid Version: ' + version)
+  }
+
+  this.raw = version
+
+  // these are actually numbers
+  this.major = +m[1]
+  this.minor = +m[2]
+  this.patch = +m[3]
+
+  if (this.major > MAX_SAFE_INTEGER || this.major < 0) {
+    throw new TypeError('Invalid major version')
+  }
+
+  if (this.minor > MAX_SAFE_INTEGER || this.minor < 0) {
+    throw new TypeError('Invalid minor version')
+  }
+
+  if (this.patch > MAX_SAFE_INTEGER || this.patch < 0) {
+    throw new TypeError('Invalid patch version')
+  }
+
+  // numberify any prerelease numeric ids
+  if (!m[4]) {
+    this.prerelease = []
+  } else {
+    this.prerelease = m[4].split('.').map(function (id) {
+      if (/^[0-9]+$/.test(id)) {
+        var num = +id
+        if (num >= 0 && num < MAX_SAFE_INTEGER) {
+          return num
+        }
+      }
+      return id
+    })
+  }
+
+  this.build = m[5] ? m[5].split('.') : []
+  this.format()
+}
+
+SemVer.prototype.format = function () {
+  this.version = this.major + '.' + this.minor + '.' + this.patch
+  if (this.prerelease.length) {
+    this.version += '-' + this.prerelease.join('.')
+  }
+  return this.version
+}
+
+SemVer.prototype.toString = function () {
+  return this.version
+}
+
+SemVer.prototype.compare = function (other) {
+  debug('SemVer.compare', this.version, this.options, other)
+  if (!(other instanceof SemVer)) {
+    other = new SemVer(other, this.options)
+  }
+
+  return this.compareMain(other) || this.comparePre(other)
+}
+
+SemVer.prototype.compareMain = function (other) {
+  if (!(other instanceof SemVer)) {
+    other = new SemVer(other, this.options)
+  }
+
+  return compareIdentifiers(this.major, other.major) ||
+         compareIdentifiers(this.minor, other.minor) ||
+         compareIdentifiers(this.patch, other.patch)
+}
+
+SemVer.prototype.comparePre = function (other) {
+  if (!(other instanceof SemVer)) {
+    other = new SemVer(other, this.options)
+  }
+
+  // NOT having a prerelease is > having one
+  if (this.prerelease.length && !other.prerelease.length) {
+    return -1
+  } else if (!this.prerelease.length && other.prerelease.length) {
+    return 1
+  } else if (!this.prerelease.length && !other.prerelease.length) {
+    return 0
+  }
+
+  var i = 0
+  do {
+    var a = this.prerelease[i]
+    var b = other.prerelease[i]
+    debug('prerelease compare', i, a, b)
+    if (a === undefined && b === undefined) {
+      return 0
+    } else if (b === undefined) {
+      return 1
+    } else if (a === undefined) {
+      return -1
+    } else if (a === b) {
+      continue
+    } else {
+      return compareIdentifiers(a, b)
+    }
+  } while (++i)
+}
+
+SemVer.prototype.compareBuild = function (other) {
+  if (!(other instanceof SemVer)) {
+    other = new SemVer(other, this.options)
+  }
+
+  var i = 0
+  do {
+    var a = this.build[i]
+    var b = other.build[i]
+    debug('prerelease compare', i, a, b)
+    if (a === undefined && b === undefined) {
+      return 0
+    } else if (b === undefined) {
+      return 1
+    } else if (a === undefined) {
+      return -1
+    } else if (a === b) {
+      continue
+    } else {
+      return compareIdentifiers(a, b)
+    }
+  } while (++i)
+}
+
+// preminor will bump the version up to the next minor release, and immediately
+// down to pre-release. premajor and prepatch work the same way.
+SemVer.prototype.inc = function (release, identifier) {
+  switch (release) {
+    case 'premajor':
+      this.prerelease.length = 0
+      this.patch = 0
+      this.minor = 0
+      this.major++
+      this.inc('pre', identifier)
+      break
+    case 'preminor':
+      this.prerelease.length = 0
+      this.patch = 0
+      this.minor++
+      this.inc('pre', identifier)
+      break
+    case 'prepatch':
+      // If this is already a prerelease, it will bump to the next version
+      // drop any prereleases that might already exist, since they are not
+      // relevant at this point.
+      this.prerelease.length = 0
+      this.inc('patch', identifier)
+      this.inc('pre', identifier)
+      break
+    // If the input is a non-prerelease version, this acts the same as
+    // prepatch.
+    case 'prerelease':
+      if (this.prerelease.length === 0) {
+        this.inc('patch', identifier)
+      }
+      this.inc('pre', identifier)
+      break
+
+    case 'major':
+      // If this is a pre-major version, bump up to the same major version.
+      // Otherwise increment major.
+      // 1.0.0-5 bumps to 1.0.0
+      // 1.1.0 bumps to 2.0.0
+      if (this.minor !== 0 ||
+          this.patch !== 0 ||
+          this.prerelease.length === 0) {
+        this.major++
+      }
+      this.minor = 0
+      this.patch = 0
+      this.prerelease = []
+      break
+    case 'minor':
+      // If this is a pre-minor version, bump up to the same minor version.
+      // Otherwise increment minor.
+      // 1.2.0-5 bumps to 1.2.0
+      // 1.2.1 bumps to 1.3.0
+      if (this.patch !== 0 || this.prerelease.length === 0) {
+        this.minor++
+      }
+      this.patch = 0
+      this.prerelease = []
+      break
+    case 'patch':
+      // If this is not a pre-release version, it will increment the patch.
+      // If it is a pre-release it will bump up to the same patch version.
+      // 1.2.0-5 patches to 1.2.0
+      // 1.2.0 patches to 1.2.1
+      if (this.prerelease.length === 0) {
+        this.patch++
+      }
+      this.prerelease = []
+      break
+    // This probably shouldn't be used publicly.
+    // 1.0.0 "pre" would become 1.0.0-0 which is the wrong direction.
+    case 'pre':
+      if (this.prerelease.length === 0) {
+        this.prerelease = [0]
+      } else {
+        var i = this.prerelease.length
+        while (--i >= 0) {
+          if (typeof this.prerelease[i] === 'number') {
+            this.prerelease[i]++
+            i = -2
+          }
+        }
+        if (i === -1) {
+          // didn't increment anything
+          this.prerelease.push(0)
+        }
+      }
+      if (identifier) {
+        // 1.2.0-beta.1 bumps to 1.2.0-beta.2,
+        // 1.2.0-beta.fooblz or 1.2.0-beta bumps to 1.2.0-beta.0
+        if (this.prerelease[0] === identifier) {
+          if (isNaN(this.prerelease[1])) {
+            this.prerelease = [identifier, 0]
+          }
+        } else {
+          this.prerelease = [identifier, 0]
+        }
+      }
+      break
+
+    default:
+      throw new Error('invalid increment argument: ' + release)
+  }
+  this.format()
+  this.raw = this.version
+  return this
+}
+
+exports.inc = inc
+function inc (version, release, loose, identifier) {
+  if (typeof (loose) === 'string') {
+    identifier = loose
+    loose = undefined
+  }
+
+  try {
+    return new SemVer(version, loose).inc(release, identifier).version
+  } catch (er) {
+    return null
+  }
+}
+
+exports.diff = diff
+function diff (version1, version2) {
+  if (eq(version1, version2)) {
+    return null
+  } else {
+    var v1 = parse(version1)
+    var v2 = parse(version2)
+    var prefix = ''
+    if (v1.prerelease.length || v2.prerelease.length) {
+      prefix = 'pre'
+      var defaultResult = 'prerelease'
+    }
+    for (var key in v1) {
+      if (key === 'major' || key === 'minor' || key === 'patch') {
+        if (v1[key] !== v2[key]) {
+          return prefix + key
+        }
+      }
+    }
+    return defaultResult // may be undefined
+  }
+}
+
+exports.compareIdentifiers = compareIdentifiers
+
+var numeric = /^[0-9]+$/
+function compareIdentifiers (a, b) {
+  var anum = numeric.test(a)
+  var bnum = numeric.test(b)
+
+  if (anum && bnum) {
+    a = +a
+    b = +b
+  }
+
+  return a === b ? 0
+    : (anum && !bnum) ? -1
+    : (bnum && !anum) ? 1
+    : a < b ? -1
+    : 1
+}
+
+exports.rcompareIdentifiers = rcompareIdentifiers
+function rcompareIdentifiers (a, b) {
+  return compareIdentifiers(b, a)
+}
+
+exports.major = major
+function major (a, loose) {
+  return new SemVer(a, loose).major
+}
+
+exports.minor = minor
+function minor (a, loose) {
+  return new SemVer(a, loose).minor
+}
+
+exports.patch = patch
+function patch (a, loose) {
+  return new SemVer(a, loose).patch
+}
+
+exports.compare = compare
+function compare (a, b, loose) {
+  return new SemVer(a, loose).compare(new SemVer(b, loose))
+}
+
+exports.compareLoose = compareLoose
+function compareLoose (a, b) {
+  return compare(a, b, true)
+}
+
+exports.compareBuild = compareBuild
+function compareBuild (a, b, loose) {
+  var versionA = new SemVer(a, loose)
+  var versionB = new SemVer(b, loose)
+  return versionA.compare(versionB) || versionA.compareBuild(versionB)
+}
+
+exports.rcompare = rcompare
+function rcompare (a, b, loose) {
+  return compare(b, a, loose)
+}
+
+exports.sort = sort
+function sort (list, loose) {
+  return list.sort(function (a, b) {
+    return exports.compareBuild(a, b, loose)
+  })
+}
+
+exports.rsort = rsort
+function rsort (list, loose) {
+  return list.sort(function (a, b) {
+    return exports.compareBuild(b, a, loose)
+  })
+}
+
+exports.gt = gt
+function gt (a, b, loose) {
+  return compare(a, b, loose) > 0
+}
+
+exports.lt = lt
+function lt (a, b, loose) {
+  return compare(a, b, loose) < 0
+}
+
+exports.eq = eq
+function eq (a, b, loose) {
+  return compare(a, b, loose) === 0
+}
+
+exports.neq = neq
+function neq (a, b, loose) {
+  return compare(a, b, loose) !== 0
+}
+
+exports.gte = gte
+function gte (a, b, loose) {
+  return compare(a, b, loose) >= 0
+}
+
+exports.lte = lte
+function lte (a, b, loose) {
+  return compare(a, b, loose) <= 0
+}
+
+exports.cmp = cmp
+function cmp (a, op, b, loose) {
+  switch (op) {
+    case '===':
+      if (typeof a === 'object')
+        a = a.version
+      if (typeof b === 'object')
+        b = b.version
+      return a === b
+
+    case '!==':
+      if (typeof a === 'object')
+        a = a.version
+      if (typeof b === 'object')
+        b = b.version
+      return a !== b
+
+    case '':
+    case '=':
+    case '==':
+      return eq(a, b, loose)
+
+    case '!=':
+      return neq(a, b, loose)
+
+    case '>':
+      return gt(a, b, loose)
+
+    case '>=':
+      return gte(a, b, loose)
+
+    case '<':
+      return lt(a, b, loose)
+
+    case '<=':
+      return lte(a, b, loose)
+
+    default:
+      throw new TypeError('Invalid operator: ' + op)
+  }
+}
+
+exports.Comparator = Comparator
+function Comparator (comp, options) {
+  if (!options || typeof options !== 'object') {
+    options = {
+      loose: !!options,
+      includePrerelease: false
+    }
+  }
+
+  if (comp instanceof Comparator) {
+    if (comp.loose === !!options.loose) {
+      return comp
+    } else {
+      comp = comp.value
+    }
+  }
+
+  if (!(this instanceof Comparator)) {
+    return new Comparator(comp, options)
+  }
+
+  comp = comp.trim().split(/\s+/).join(' ')
+  debug('comparator', comp, options)
+  this.options = options
+  this.loose = !!options.loose
+  this.parse(comp)
+
+  if (this.semver === ANY) {
+    this.value = ''
+  } else {
+    this.value = this.operator + this.semver.version
+  }
+
+  debug('comp', this)
+}
+
+var ANY = {}
+Comparator.prototype.parse = function (comp) {
+  var r = this.options.loose ? safeRe[t.COMPARATORLOOSE] : safeRe[t.COMPARATOR]
+  var m = comp.match(r)
+
+  if (!m) {
+    throw new TypeError('Invalid comparator: ' + comp)
+  }
+
+  this.operator = m[1] !== undefined ? m[1] : ''
+  if (this.operator === '=') {
+    this.operator = ''
+  }
+
+  // if it literally is just '>' or '' then allow anything.
+  if (!m[2]) {
+    this.semver = ANY
+  } else {
+    this.semver = new SemVer(m[2], this.options.loose)
+  }
+}
+
+Comparator.prototype.toString = function () {
+  return this.value
+}
+
+Comparator.prototype.test = function (version) {
+  debug('Comparator.test', version, this.options.loose)
+
+  if (this.semver === ANY || version === ANY) {
+    return true
+  }
+
+  if (typeof version === 'string') {
+    try {
+      version = new SemVer(version, this.options)
+    } catch (er) {
+      return false
+    }
+  }
+
+  return cmp(version, this.operator, this.semver, this.options)
+}
+
+Comparator.prototype.intersects = function (comp, options) {
+  if (!(comp instanceof Comparator)) {
+    throw new TypeError('a Comparator is required')
+  }
+
+  if (!options || typeof options !== 'object') {
+    options = {
+      loose: !!options,
+      includePrerelease: false
+    }
+  }
+
+  var rangeTmp
+
+  if (this.operator === '') {
+    if (this.value === '') {
+      return true
+    }
+    rangeTmp = new Range(comp.value, options)
+    return satisfies(this.value, rangeTmp, options)
+  } else if (comp.operator === '') {
+    if (comp.value === '') {
+      return true
+    }
+    rangeTmp = new Range(this.value, options)
+    return satisfies(comp.semver, rangeTmp, options)
+  }
+
+  var sameDirectionIncreasing =
+    (this.operator === '>=' || this.operator === '>') &&
+    (comp.operator === '>=' || comp.operator === '>')
+  var sameDirectionDecreasing =
+    (this.operator === '<=' || this.operator === '<') &&
+    (comp.operator === '<=' || comp.operator === '<')
+  var sameSemVer = this.semver.version === comp.semver.version
+  var differentDirectionsInclusive =
+    (this.operator === '>=' || this.operator === '<=') &&
+    (comp.operator === '>=' || comp.operator === '<=')
+  var oppositeDirectionsLessThan =
+    cmp(this.semver, '<', comp.semver, options) &&
+    ((this.operator === '>=' || this.operator === '>') &&
+    (comp.operator === '<=' || comp.operator === '<'))
+  var oppositeDirectionsGreaterThan =
+    cmp(this.semver, '>', comp.semver, options) &&
+    ((this.operator === '<=' || this.operator === '<') &&
+    (comp.operator === '>=' || comp.operator === '>'))
+
+  return sameDirectionIncreasing || sameDirectionDecreasing ||
+    (sameSemVer && differentDirectionsInclusive) ||
+    oppositeDirectionsLessThan || oppositeDirectionsGreaterThan
+}
+
+exports.Range = Range
+function Range (range, options) {
+  if (!options || typeof options !== 'object') {
+    options = {
+      loose: !!options,
+      includePrerelease: false
+    }
+  }
+
+  if (range instanceof Range) {
+    if (range.loose === !!options.loose &&
+        range.includePrerelease === !!options.includePrerelease) {
+      return range
+    } else {
+      return new Range(range.raw, options)
+    }
+  }
+
+  if (range instanceof Comparator) {
+    return new Range(range.value, options)
+  }
+
+  if (!(this instanceof Range)) {
+    return new Range(range, options)
+  }
+
+  this.options = options
+  this.loose = !!options.loose
+  this.includePrerelease = !!options.includePrerelease
+
+  // First reduce all whitespace as much as possible so we do not have to rely
+  // on potentially slow regexes like \s*. This is then stored and used for
+  // future error messages as well.
+  this.raw = range
+    .trim()
+    .split(/\s+/)
+    .join(' ')
+
+  // First, split based on boolean or ||
+  this.set = this.raw.split('||').map(function (range) {
+    return this.parseRange(range.trim())
+  }, this).filter(function (c) {
+    // throw out any that are not relevant for whatever reason
+    return c.length
+  })
+
+  if (!this.set.length) {
+    throw new TypeError('Invalid SemVer Range: ' + this.raw)
+  }
+
+  this.format()
+}
+
+Range.prototype.format = function () {
+  this.range = this.set.map(function (comps) {
+    return comps.join(' ').trim()
+  }).join('||').trim()
+  return this.range
+}
+
+Range.prototype.toString = function () {
+  return this.range
+}
+
+Range.prototype.parseRange = function (range) {
+  var loose = this.options.loose
+  // `1.2.3 - 1.2.4` => `>=1.2.3 <=1.2.4`
+  var hr = loose ? safeRe[t.HYPHENRANGELOOSE] : safeRe[t.HYPHENRANGE]
+  range = range.replace(hr, hyphenReplace)
+  debug('hyphen replace', range)
+  // `> 1.2.3 < 1.2.5` => `>1.2.3 <1.2.5`
+  range = range.replace(safeRe[t.COMPARATORTRIM], comparatorTrimReplace)
+  debug('comparator trim', range, safeRe[t.COMPARATORTRIM])
+
+  // `~ 1.2.3` => `~1.2.3`
+  range = range.replace(safeRe[t.TILDETRIM], tildeTrimReplace)
+
+  // `^ 1.2.3` => `^1.2.3`
+  range = range.replace(safeRe[t.CARETTRIM], caretTrimReplace)
+
+  // normalize spaces
+  range = range.split(/\s+/).join(' ')
+
+  // At this point, the range is completely trimmed and
+  // ready to be split into comparators.
+
+  var compRe = loose ? safeRe[t.COMPARATORLOOSE] : safeRe[t.COMPARATOR]
+  var set = range.split(' ').map(function (comp) {
+    return parseComparator(comp, this.options)
+  }, this).join(' ').split(/\s+/)
+  if (this.options.loose) {
+    // in loose mode, throw out any that are not valid comparators
+    set = set.filter(function (comp) {
+      return !!comp.match(compRe)
+    })
+  }
+  set = set.map(function (comp) {
+    return new Comparator(comp, this.options)
+  }, this)
+
+  return set
+}
+
+Range.prototype.intersects = function (range, options) {
+  if (!(range instanceof Range)) {
+    throw new TypeError('a Range is required')
+  }
+
+  return this.set.some(function (thisComparators) {
+    return (
+      isSatisfiable(thisComparators, options) &&
+      range.set.some(function (rangeComparators) {
+        return (
+          isSatisfiable(rangeComparators, options) &&
+          thisComparators.every(function (thisComparator) {
+            return rangeComparators.every(function (rangeComparator) {
+              return thisComparator.intersects(rangeComparator, options)
+            })
+          })
+        )
+      })
+    )
+  })
+}
+
+// take a set of comparators and determine whether there
+// exists a version which can satisfy it
+function isSatisfiable (comparators, options) {
+  var result = true
+  var remainingComparators = comparators.slice()
+  var testComparator = remainingComparators.pop()
+
+  while (result && remainingComparators.length) {
+    result = remainingComparators.every(function (otherComparator) {
+      return testComparator.intersects(otherComparator, options)
+    })
+
+    testComparator = remainingComparators.pop()
+  }
+
+  return result
+}
+
+// Mostly just for testing and legacy API reasons
+exports.toComparators = toComparators
+function toComparators (range, options) {
+  return new Range(range, options).set.map(function (comp) {
+    return comp.map(function (c) {
+      return c.value
+    }).join(' ').trim().split(' ')
+  })
+}
+
+// comprised of xranges, tildes, stars, and gtlt's at this point.
+// already replaced the hyphen ranges
+// turn into a set of JUST comparators.
+function parseComparator (comp, options) {
+  debug('comp', comp, options)
+  comp = replaceCarets(comp, options)
+  debug('caret', comp)
+  comp = replaceTildes(comp, options)
+  debug('tildes', comp)
+  comp = replaceXRanges(comp, options)
+  debug('xrange', comp)
+  comp = replaceStars(comp, options)
+  debug('stars', comp)
+  return comp
+}
+
+function isX (id) {
+  return !id || id.toLowerCase() === 'x' || id === '*'
+}
+
+// ~, ~> --> * (any, kinda silly)
+// ~2, ~2.x, ~2.x.x, ~>2, ~>2.x ~>2.x.x --> >=2.0.0 <3.0.0
+// ~2.0, ~2.0.x, ~>2.0, ~>2.0.x --> >=2.0.0 <2.1.0
+// ~1.2, ~1.2.x, ~>1.2, ~>1.2.x --> >=1.2.0 <1.3.0
+// ~1.2.3, ~>1.2.3 --> >=1.2.3 <1.3.0
+// ~1.2.0, ~>1.2.0 --> >=1.2.0 <1.3.0
+function replaceTildes (comp, options) {
+  return comp.trim().split(/\s+/).map(function (comp) {
+    return replaceTilde(comp, options)
+  }).join(' ')
+}
+
+function replaceTilde (comp, options) {
+  var r = options.loose ? safeRe[t.TILDELOOSE] : safeRe[t.TILDE]
+  return comp.replace(r, function (_, M, m, p, pr) {
+    debug('tilde', comp, _, M, m, p, pr)
+    var ret
+
+    if (isX(M)) {
+      ret = ''
+    } else if (isX(m)) {
+      ret = '>=' + M + '.0.0 <' + (+M + 1) + '.0.0'
+    } else if (isX(p)) {
+      // ~1.2 == >=1.2.0 <1.3.0
+      ret = '>=' + M + '.' + m + '.0 <' + M + '.' + (+m + 1) + '.0'
+    } else if (pr) {
+      debug('replaceTilde pr', pr)
+      ret = '>=' + M + '.' + m + '.' + p + '-' + pr +
+            ' <' + M + '.' + (+m + 1) + '.0'
+    } else {
+      // ~1.2.3 == >=1.2.3 <1.3.0
+      ret = '>=' + M + '.' + m + '.' + p +
+            ' <' + M + '.' + (+m + 1) + '.0'
+    }
+
+    debug('tilde return', ret)
+    return ret
+  })
+}
+
+// ^ --> * (any, kinda silly)
+// ^2, ^2.x, ^2.x.x --> >=2.0.0 <3.0.0
+// ^2.0, ^2.0.x --> >=2.0.0 <3.0.0
+// ^1.2, ^1.2.x --> >=1.2.0 <2.0.0
+// ^1.2.3 --> >=1.2.3 <2.0.0
+// ^1.2.0 --> >=1.2.0 <2.0.0
+function replaceCarets (comp, options) {
+  return comp.trim().split(/\s+/).map(function (comp) {
+    return replaceCaret(comp, options)
+  }).join(' ')
+}
+
+function replaceCaret (comp, options) {
+  debug('caret', comp, options)
+  var r = options.loose ? safeRe[t.CARETLOOSE] : safeRe[t.CARET]
+  return comp.replace(r, function (_, M, m, p, pr) {
+    debug('caret', comp, _, M, m, p, pr)
+    var ret
+
+    if (isX(M)) {
+      ret = ''
+    } else if (isX(m)) {
+      ret = '>=' + M + '.0.0 <' + (+M + 1) + '.0.0'
+    } else if (isX(p)) {
+      if (M === '0') {
+        ret = '>=' + M + '.' + m + '.0 <' + M + '.' + (+m + 1) + '.0'
+      } else {
+        ret = '>=' + M + '.' + m + '.0 <' + (+M + 1) + '.0.0'
+      }
+    } else if (pr) {
+      debug('replaceCaret pr', pr)
+      if (M === '0') {
+        if (m === '0') {
+          ret = '>=' + M + '.' + m + '.' + p + '-' + pr +
+                ' <' + M + '.' + m + '.' + (+p + 1)
+        } else {
+          ret = '>=' + M + '.' + m + '.' + p + '-' + pr +
+                ' <' + M + '.' + (+m + 1) + '.0'
+        }
+      } else {
+        ret = '>=' + M + '.' + m + '.' + p + '-' + pr +
+              ' <' + (+M + 1) + '.0.0'
+      }
+    } else {
+      debug('no pr')
+      if (M === '0') {
+        if (m === '0') {
+          ret = '>=' + M + '.' + m + '.' + p +
+                ' <' + M + '.' + m + '.' + (+p + 1)
+        } else {
+          ret = '>=' + M + '.' + m + '.' + p +
+                ' <' + M + '.' + (+m + 1) + '.0'
+        }
+      } else {
+        ret = '>=' + M + '.' + m + '.' + p +
+              ' <' + (+M + 1) + '.0.0'
+      }
+    }
+
+    debug('caret return', ret)
+    return ret
+  })
+}
+
+function replaceXRanges (comp, options) {
+  debug('replaceXRanges', comp, options)
+  return comp.split(/\s+/).map(function (comp) {
+    return replaceXRange(comp, options)
+  }).join(' ')
+}
+
+function replaceXRange (comp, options) {
+  comp = comp.trim()
+  var r = options.loose ? safeRe[t.XRANGELOOSE] : safeRe[t.XRANGE]
+  return comp.replace(r, function (ret, gtlt, M, m, p, pr) {
+    debug('xRange', comp, ret, gtlt, M, m, p, pr)
+    var xM = isX(M)
+    var xm = xM || isX(m)
+    var xp = xm || isX(p)
+    var anyX = xp
+
+    if (gtlt === '=' && anyX) {
+      gtlt = ''
+    }
+
+    // if we're including prereleases in the match, then we need
+    // to fix this to -0, the lowest possible prerelease value
+    pr = options.includePrerelease ? '-0' : ''
+
+    if (xM) {
+      if (gtlt === '>' || gtlt === '<') {
+        // nothing is allowed
+        ret = '<0.0.0-0'
+      } else {
+        // nothing is forbidden
+        ret = '*'
+      }
+    } else if (gtlt && anyX) {
+      // we know patch is an x, because we have any x at all.
+      // replace X with 0
+      if (xm) {
+        m = 0
+      }
+      p = 0
+
+      if (gtlt === '>') {
+        // >1 => >=2.0.0
+        // >1.2 => >=1.3.0
+        // >1.2.3 => >= 1.2.4
+        gtlt = '>='
+        if (xm) {
+          M = +M + 1
+          m = 0
+          p = 0
+        } else {
+          m = +m + 1
+          p = 0
+        }
+      } else if (gtlt === '<=') {
+        // <=0.7.x is actually <0.8.0, since any 0.7.x should
+        // pass.  Similarly, <=7.x is actually <8.0.0, etc.
+        gtlt = '<'
+        if (xm) {
+          M = +M + 1
+        } else {
+          m = +m + 1
+        }
+      }
+
+      ret = gtlt + M + '.' + m + '.' + p + pr
+    } else if (xm) {
+      ret = '>=' + M + '.0.0' + pr + ' <' + (+M + 1) + '.0.0' + pr
+    } else if (xp) {
+      ret = '>=' + M + '.' + m + '.0' + pr +
+        ' <' + M + '.' + (+m + 1) + '.0' + pr
+    }
+
+    debug('xRange return', ret)
+
+    return ret
+  })
+}
+
+// Because * is AND-ed with everything else in the comparator,
+// and '' means "any version", just remove the *s entirely.
+function replaceStars (comp, options) {
+  debug('replaceStars', comp, options)
+  // Looseness is ignored here.  star is always as loose as it gets!
+  return comp.trim().replace(safeRe[t.STAR], '')
+}
+
+// This function is passed to string.replace(re[t.HYPHENRANGE])
+// M, m, patch, prerelease, build
+// 1.2 - 3.4.5 => >=1.2.0 <=3.4.5
+// 1.2.3 - 3.4 => >=1.2.0 <3.5.0 Any 3.4.x will do
+// 1.2 - 3.4 => >=1.2.0 <3.5.0
+function hyphenReplace ($0,
+  from, fM, fm, fp, fpr, fb,
+  to, tM, tm, tp, tpr, tb) {
+  if (isX(fM)) {
+    from = ''
+  } else if (isX(fm)) {
+    from = '>=' + fM + '.0.0'
+  } else if (isX(fp)) {
+    from = '>=' + fM + '.' + fm + '.0'
+  } else {
+    from = '>=' + from
+  }
+
+  if (isX(tM)) {
+    to = ''
+  } else if (isX(tm)) {
+    to = '<' + (+tM + 1) + '.0.0'
+  } else if (isX(tp)) {
+    to = '<' + tM + '.' + (+tm + 1) + '.0'
+  } else if (tpr) {
+    to = '<=' + tM + '.' + tm + '.' + tp + '-' + tpr
+  } else {
+    to = '<=' + to
+  }
+
+  return (from + ' ' + to).trim()
+}
+
+// if ANY of the sets match ALL of its comparators, then pass
+Range.prototype.test = function (version) {
+  if (!version) {
+    return false
+  }
+
+  if (typeof version === 'string') {
+    try {
+      version = new SemVer(version, this.options)
+    } catch (er) {
+      return false
+    }
+  }
+
+  for (var i = 0; i < this.set.length; i++) {
+    if (testSet(this.set[i], version, this.options)) {
+      return true
+    }
+  }
+  return false
+}
+
+function testSet (set, version, options) {
+  for (var i = 0; i < set.length; i++) {
+    if (!set[i].test(version)) {
+      return false
+    }
+  }
+
+  if (version.prerelease.length && !options.includePrerelease) {
+    // Find the set of versions that are allowed to have prereleases
+    // For example, ^1.2.3-pr.1 desugars to >=1.2.3-pr.1 <2.0.0
+    // That should allow `1.2.3-pr.2` to pass.
+    // However, `1.2.4-alpha.notready` should NOT be allowed,
+    // even though it's within the range set by the comparators.
+    for (i = 0; i < set.length; i++) {
+      debug(set[i].semver)
+      if (set[i].semver === ANY) {
+        continue
+      }
+
+      if (set[i].semver.prerelease.length > 0) {
+        var allowed = set[i].semver
+        if (allowed.major === version.major &&
+            allowed.minor === version.minor &&
+            allowed.patch === version.patch) {
+          return true
+        }
+      }
+    }
+
+    // Version has a -pre, but it's not one of the ones we like.
+    return false
+  }
+
+  return true
+}
+
+exports.satisfies = satisfies
+function satisfies (version, range, options) {
+  try {
+    range = new Range(range, options)
+  } catch (er) {
+    return false
+  }
+  return range.test(version)
+}
+
+exports.maxSatisfying = maxSatisfying
+function maxSatisfying (versions, range, options) {
+  var max = null
+  var maxSV = null
+  try {
+    var rangeObj = new Range(range, options)
+  } catch (er) {
+    return null
+  }
+  versions.forEach(function (v) {
+    if (rangeObj.test(v)) {
+      // satisfies(v, range, options)
+      if (!max || maxSV.compare(v) === -1) {
+        // compare(max, v, true)
+        max = v
+        maxSV = new SemVer(max, options)
+      }
+    }
+  })
+  return max
+}
+
+exports.minSatisfying = minSatisfying
+function minSatisfying (versions, range, options) {
+  var min = null
+  var minSV = null
+  try {
+    var rangeObj = new Range(range, options)
+  } catch (er) {
+    return null
+  }
+  versions.forEach(function (v) {
+    if (rangeObj.test(v)) {
+      // satisfies(v, range, options)
+      if (!min || minSV.compare(v) === 1) {
+        // compare(min, v, true)
+        min = v
+        minSV = new SemVer(min, options)
+      }
+    }
+  })
+  return min
+}
+
+exports.minVersion = minVersion
+function minVersion (range, loose) {
+  range = new Range(range, loose)
+
+  var minver = new SemVer('0.0.0')
+  if (range.test(minver)) {
+    return minver
+  }
+
+  minver = new SemVer('0.0.0-0')
+  if (range.test(minver)) {
+    return minver
+  }
+
+  minver = null
+  for (var i = 0; i < range.set.length; ++i) {
+    var comparators = range.set[i]
+
+    comparators.forEach(function (comparator) {
+      // Clone to avoid manipulating the comparator's semver object.
+      var compver = new SemVer(comparator.semver.version)
+      switch (comparator.operator) {
+        case '>':
+          if (compver.prerelease.length === 0) {
+            compver.patch++
+          } else {
+            compver.prerelease.push(0)
+          }
+          compver.raw = compver.format()
+          /* fallthrough */
+        case '':
+        case '>=':
+          if (!minver || gt(minver, compver)) {
+            minver = compver
+          }
+          break
+        case '<':
+        case '<=':
+          /* Ignore maximum versions */
+          break
+        /* istanbul ignore next */
+        default:
+          throw new Error('Unexpected operation: ' + comparator.operator)
+      }
+    })
+  }
+
+  if (minver && range.test(minver)) {
+    return minver
+  }
+
+  return null
+}
+
+exports.validRange = validRange
+function validRange (range, options) {
+  try {
+    // Return '*' instead of '' so that truthiness works.
+    // This will throw if it's invalid anyway
+    return new Range(range, options).range || '*'
+  } catch (er) {
+    return null
+  }
+}
+
+// Determine if version is less than all the versions possible in the range
+exports.ltr = ltr
+function ltr (version, range, options) {
+  return outside(version, range, '<', options)
+}
+
+// Determine if version is greater than all the versions possible in the range.
+exports.gtr = gtr
+function gtr (version, range, options) {
+  return outside(version, range, '>', options)
+}
+
+exports.outside = outside
+function outside (version, range, hilo, options) {
+  version = new SemVer(version, options)
+  range = new Range(range, options)
+
+  var gtfn, ltefn, ltfn, comp, ecomp
+  switch (hilo) {
+    case '>':
+      gtfn = gt
+      ltefn = lte
+      ltfn = lt
+      comp = '>'
+      ecomp = '>='
+      break
+    case '<':
+      gtfn = lt
+      ltefn = gte
+      ltfn = gt
+      comp = '<'
+      ecomp = '<='
+      break
+    default:
+      throw new TypeError('Must provide a hilo val of "<" or ">"')
+  }
+
+  // If it satisifes the range it is not outside
+  if (satisfies(version, range, options)) {
+    return false
+  }
+
+  // From now on, variable terms are as if we're in "gtr" mode.
+  // but note that everything is flipped for the "ltr" function.
+
+  for (var i = 0; i < range.set.length; ++i) {
+    var comparators = range.set[i]
+
+    var high = null
+    var low = null
+
+    comparators.forEach(function (comparator) {
+      if (comparator.semver === ANY) {
+        comparator = new Comparator('>=0.0.0')
+      }
+      high = high || comparator
+      low = low || comparator
+      if (gtfn(comparator.semver, high.semver, options)) {
+        high = comparator
+      } else if (ltfn(comparator.semver, low.semver, options)) {
+        low = comparator
+      }
+    })
+
+    // If the edge version comparator has a operator then our version
+    // isn't outside it
+    if (high.operator === comp || high.operator === ecomp) {
+      return false
+    }
+
+    // If the lowest version comparator has an operator and our version
+    // is less than it then it isn't higher than the range
+    if ((!low.operator || low.operator === comp) &&
+        ltefn(version, low.semver)) {
+      return false
+    } else if (low.operator === ecomp && ltfn(version, low.semver)) {
+      return false
+    }
+  }
+  return true
+}
+
+exports.prerelease = prerelease
+function prerelease (version, options) {
+  var parsed = parse(version, options)
+  return (parsed && parsed.prerelease.length) ? parsed.prerelease : null
+}
+
+exports.intersects = intersects
+function intersects (r1, r2, options) {
+  r1 = new Range(r1, options)
+  r2 = new Range(r2, options)
+  return r1.intersects(r2)
+}
+
+exports.coerce = coerce
+function coerce (version, options) {
+  if (version instanceof SemVer) {
+    return version
+  }
+
+  if (typeof version === 'number') {
+    version = String(version)
+  }
+
+  if (typeof version !== 'string') {
+    return null
+  }
+
+  options = options || {}
+
+  var match = null
+  if (!options.rtl) {
+    match = version.match(safeRe[t.COERCE])
+  } else {
+    // Find the right-most coercible string that does not share
+    // a terminus with a more left-ward coercible string.
+    // Eg, '1.2.3.4' wants to coerce '2.3.4', not '3.4' or '4'
+    //
+    // Walk through the string checking with a /g regexp
+    // Manually set the index so as to pick up overlapping matches.
+    // Stop when we get a match that ends at the string end, since no
+    // coercible string can be more right-ward without the same terminus.
+    var next
+    while ((next = safeRe[t.COERCERTL].exec(version)) &&
+      (!match || match.index + match[0].length !== version.length)
+    ) {
+      if (!match ||
+          next.index + next[0].length !== match.index + match[0].length) {
+        match = next
+      }
+      safeRe[t.COERCERTL].lastIndex = next.index + next[1].length + next[2].length
+    }
+    // leave it in a clean state
+    safeRe[t.COERCERTL].lastIndex = -1
+  }
+
+  if (match === null) {
+    return null
+  }
+
+  return parse(match[2] +
+    '.' + (match[3] || '0') +
+    '.' + (match[4] || '0'), options)
+}
 
 
 /***/ }),
@@ -60398,6 +57103,132 @@ module.exports = buildConnector
 
 /***/ }),
 
+/***/ 5398:
+/***/ ((module) => {
+
+"use strict";
+
+
+/** @type {Record<string, string | undefined>} */
+const headerNameLowerCasedRecord = {}
+
+// https://developer.mozilla.org/docs/Web/HTTP/Headers
+const wellknownHeaderNames = [
+  'Accept',
+  'Accept-Encoding',
+  'Accept-Language',
+  'Accept-Ranges',
+  'Access-Control-Allow-Credentials',
+  'Access-Control-Allow-Headers',
+  'Access-Control-Allow-Methods',
+  'Access-Control-Allow-Origin',
+  'Access-Control-Expose-Headers',
+  'Access-Control-Max-Age',
+  'Access-Control-Request-Headers',
+  'Access-Control-Request-Method',
+  'Age',
+  'Allow',
+  'Alt-Svc',
+  'Alt-Used',
+  'Authorization',
+  'Cache-Control',
+  'Clear-Site-Data',
+  'Connection',
+  'Content-Disposition',
+  'Content-Encoding',
+  'Content-Language',
+  'Content-Length',
+  'Content-Location',
+  'Content-Range',
+  'Content-Security-Policy',
+  'Content-Security-Policy-Report-Only',
+  'Content-Type',
+  'Cookie',
+  'Cross-Origin-Embedder-Policy',
+  'Cross-Origin-Opener-Policy',
+  'Cross-Origin-Resource-Policy',
+  'Date',
+  'Device-Memory',
+  'Downlink',
+  'ECT',
+  'ETag',
+  'Expect',
+  'Expect-CT',
+  'Expires',
+  'Forwarded',
+  'From',
+  'Host',
+  'If-Match',
+  'If-Modified-Since',
+  'If-None-Match',
+  'If-Range',
+  'If-Unmodified-Since',
+  'Keep-Alive',
+  'Last-Modified',
+  'Link',
+  'Location',
+  'Max-Forwards',
+  'Origin',
+  'Permissions-Policy',
+  'Pragma',
+  'Proxy-Authenticate',
+  'Proxy-Authorization',
+  'RTT',
+  'Range',
+  'Referer',
+  'Referrer-Policy',
+  'Refresh',
+  'Retry-After',
+  'Sec-WebSocket-Accept',
+  'Sec-WebSocket-Extensions',
+  'Sec-WebSocket-Key',
+  'Sec-WebSocket-Protocol',
+  'Sec-WebSocket-Version',
+  'Server',
+  'Server-Timing',
+  'Service-Worker-Allowed',
+  'Service-Worker-Navigation-Preload',
+  'Set-Cookie',
+  'SourceMap',
+  'Strict-Transport-Security',
+  'Supports-Loading-Mode',
+  'TE',
+  'Timing-Allow-Origin',
+  'Trailer',
+  'Transfer-Encoding',
+  'Upgrade',
+  'Upgrade-Insecure-Requests',
+  'User-Agent',
+  'Vary',
+  'Via',
+  'WWW-Authenticate',
+  'X-Content-Type-Options',
+  'X-DNS-Prefetch-Control',
+  'X-Frame-Options',
+  'X-Permitted-Cross-Domain-Policies',
+  'X-Powered-By',
+  'X-Requested-With',
+  'X-XSS-Protection'
+]
+
+for (let i = 0; i < wellknownHeaderNames.length; ++i) {
+  const key = wellknownHeaderNames[i]
+  const lowerCasedKey = key.toLowerCase()
+  headerNameLowerCasedRecord[key] = headerNameLowerCasedRecord[lowerCasedKey] =
+    lowerCasedKey
+}
+
+// Note: object prototypes should not be able to be referenced. e.g. `Object#hasOwnProperty`.
+Object.setPrototypeOf(headerNameLowerCasedRecord, null)
+
+module.exports = {
+  wellknownHeaderNames,
+  headerNameLowerCasedRecord
+}
+
+
+/***/ }),
+
 /***/ 4556:
 /***/ ((module) => {
 
@@ -61228,6 +58059,7 @@ const { InvalidArgumentError } = __nccwpck_require__(4556)
 const { Blob } = __nccwpck_require__(4300)
 const nodeUtil = __nccwpck_require__(3837)
 const { stringify } = __nccwpck_require__(3477)
+const { headerNameLowerCasedRecord } = __nccwpck_require__(5398)
 
 const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(v => Number(v))
 
@@ -61435,6 +58267,15 @@ const KEEPALIVE_TIMEOUT_EXPR = /timeout=(\d+)/
 function parseKeepAliveTimeout (val) {
   const m = val.toString().match(KEEPALIVE_TIMEOUT_EXPR)
   return m ? parseInt(m[1], 10) * 1000 : null
+}
+
+/**
+ * Retrieves a header name and returns its lowercase value.
+ * @param {string | Buffer} value Header name
+ * @returns {string}
+ */
+function headerNameToString (value) {
+  return headerNameLowerCasedRecord[value] || value.toLowerCase()
 }
 
 function parseHeaders (headers, obj = {}) {
@@ -61708,6 +58549,7 @@ module.exports = {
   isIterable,
   isAsyncIterable,
   isDestroyed,
+  headerNameToString,
   parseRawHeaders,
   parseHeaders,
   parseKeepAliveTimeout,
@@ -68355,14 +65197,18 @@ const { isBlobLike, toUSVString, ReadableStreamFrom } = __nccwpck_require__(5499
 const assert = __nccwpck_require__(9491)
 const { isUint8Array } = __nccwpck_require__(9830)
 
+let supportedHashes = []
+
 // https://nodejs.org/api/crypto.html#determining-if-crypto-support-is-unavailable
 /** @type {import('crypto')|undefined} */
 let crypto
 
 try {
   crypto = __nccwpck_require__(6113)
+  const possibleRelevantHashes = ['sha256', 'sha384', 'sha512']
+  supportedHashes = crypto.getHashes().filter((hash) => possibleRelevantHashes.includes(hash))
+/* c8 ignore next 3 */
 } catch {
-
 }
 
 function responseURL (response) {
@@ -68890,66 +65736,56 @@ function bytesMatch (bytes, metadataList) {
     return true
   }
 
-  // 3. If parsedMetadata is the empty set, return true.
+  // 3. If response is not eligible for integrity validation, return false.
+  // TODO
+
+  // 4. If parsedMetadata is the empty set, return true.
   if (parsedMetadata.length === 0) {
     return true
   }
 
-  // 4. Let metadata be the result of getting the strongest
+  // 5. Let metadata be the result of getting the strongest
   //    metadata from parsedMetadata.
-  const list = parsedMetadata.sort((c, d) => d.algo.localeCompare(c.algo))
-  // get the strongest algorithm
-  const strongest = list[0].algo
-  // get all entries that use the strongest algorithm; ignore weaker
-  const metadata = list.filter((item) => item.algo === strongest)
+  const strongest = getStrongestMetadata(parsedMetadata)
+  const metadata = filterMetadataListByAlgorithm(parsedMetadata, strongest)
 
-  // 5. For each item in metadata:
+  // 6. For each item in metadata:
   for (const item of metadata) {
     // 1. Let algorithm be the alg component of item.
     const algorithm = item.algo
 
     // 2. Let expectedValue be the val component of item.
-    let expectedValue = item.hash
+    const expectedValue = item.hash
 
     // See https://github.com/web-platform-tests/wpt/commit/e4c5cc7a5e48093220528dfdd1c4012dc3837a0e
     // "be liberal with padding". This is annoying, and it's not even in the spec.
 
-    if (expectedValue.endsWith('==')) {
-      expectedValue = expectedValue.slice(0, -2)
-    }
-
     // 3. Let actualValue be the result of applying algorithm to bytes.
     let actualValue = crypto.createHash(algorithm).update(bytes).digest('base64')
 
-    if (actualValue.endsWith('==')) {
-      actualValue = actualValue.slice(0, -2)
+    if (actualValue[actualValue.length - 1] === '=') {
+      if (actualValue[actualValue.length - 2] === '=') {
+        actualValue = actualValue.slice(0, -2)
+      } else {
+        actualValue = actualValue.slice(0, -1)
+      }
     }
 
     // 4. If actualValue is a case-sensitive match for expectedValue,
     //    return true.
-    if (actualValue === expectedValue) {
-      return true
-    }
-
-    let actualBase64URL = crypto.createHash(algorithm).update(bytes).digest('base64url')
-
-    if (actualBase64URL.endsWith('==')) {
-      actualBase64URL = actualBase64URL.slice(0, -2)
-    }
-
-    if (actualBase64URL === expectedValue) {
+    if (compareBase64Mixed(actualValue, expectedValue)) {
       return true
     }
   }
 
-  // 6. Return false.
+  // 7. Return false.
   return false
 }
 
 // https://w3c.github.io/webappsec-subresource-integrity/#grammardef-hash-with-options
 // https://www.w3.org/TR/CSP2/#source-list-syntax
 // https://www.rfc-editor.org/rfc/rfc5234#appendix-B.1
-const parseHashWithOptions = /((?<algo>sha256|sha384|sha512)-(?<hash>[A-z0-9+/]{1}.*={0,2}))( +[\x21-\x7e]?)?/i
+const parseHashWithOptions = /(?<algo>sha256|sha384|sha512)-((?<hash>[A-Za-z0-9+/]+|[A-Za-z0-9_-]+)={0,2}(?:\s|$)( +[!-~]*)?)?/i
 
 /**
  * @see https://w3c.github.io/webappsec-subresource-integrity/#parse-metadata
@@ -68963,8 +65799,6 @@ function parseMetadata (metadata) {
   // 2. Let empty be equal to true.
   let empty = true
 
-  const supportedHashes = crypto.getHashes()
-
   // 3. For each token returned by splitting metadata on spaces:
   for (const token of metadata.split(' ')) {
     // 1. Set empty to false.
@@ -68974,7 +65808,11 @@ function parseMetadata (metadata) {
     const parsedToken = parseHashWithOptions.exec(token)
 
     // 3. If token does not parse, continue to the next token.
-    if (parsedToken === null || parsedToken.groups === undefined) {
+    if (
+      parsedToken === null ||
+      parsedToken.groups === undefined ||
+      parsedToken.groups.algo === undefined
+    ) {
       // Note: Chromium blocks the request at this point, but Firefox
       // gives a warning that an invalid integrity was given. The
       // correct behavior is to ignore these, and subsequently not
@@ -68983,11 +65821,11 @@ function parseMetadata (metadata) {
     }
 
     // 4. Let algorithm be the hash-algo component of token.
-    const algorithm = parsedToken.groups.algo
+    const algorithm = parsedToken.groups.algo.toLowerCase()
 
     // 5. If algorithm is a hash function recognized by the user
     //    agent, add the parsed token to result.
-    if (supportedHashes.includes(algorithm.toLowerCase())) {
+    if (supportedHashes.includes(algorithm)) {
       result.push(parsedToken.groups)
     }
   }
@@ -68998,6 +65836,82 @@ function parseMetadata (metadata) {
   }
 
   return result
+}
+
+/**
+ * @param {{ algo: 'sha256' | 'sha384' | 'sha512' }[]} metadataList
+ */
+function getStrongestMetadata (metadataList) {
+  // Let algorithm be the algo component of the first item in metadataList.
+  // Can be sha256
+  let algorithm = metadataList[0].algo
+  // If the algorithm is sha512, then it is the strongest
+  // and we can return immediately
+  if (algorithm[3] === '5') {
+    return algorithm
+  }
+
+  for (let i = 1; i < metadataList.length; ++i) {
+    const metadata = metadataList[i]
+    // If the algorithm is sha512, then it is the strongest
+    // and we can break the loop immediately
+    if (metadata.algo[3] === '5') {
+      algorithm = 'sha512'
+      break
+    // If the algorithm is sha384, then a potential sha256 or sha384 is ignored
+    } else if (algorithm[3] === '3') {
+      continue
+    // algorithm is sha256, check if algorithm is sha384 and if so, set it as
+    // the strongest
+    } else if (metadata.algo[3] === '3') {
+      algorithm = 'sha384'
+    }
+  }
+  return algorithm
+}
+
+function filterMetadataListByAlgorithm (metadataList, algorithm) {
+  if (metadataList.length === 1) {
+    return metadataList
+  }
+
+  let pos = 0
+  for (let i = 0; i < metadataList.length; ++i) {
+    if (metadataList[i].algo === algorithm) {
+      metadataList[pos++] = metadataList[i]
+    }
+  }
+
+  metadataList.length = pos
+
+  return metadataList
+}
+
+/**
+ * Compares two base64 strings, allowing for base64url
+ * in the second string.
+ *
+* @param {string} actualValue always base64
+ * @param {string} expectedValue base64 or base64url
+ * @returns {boolean}
+ */
+function compareBase64Mixed (actualValue, expectedValue) {
+  if (actualValue.length !== expectedValue.length) {
+    return false
+  }
+  for (let i = 0; i < actualValue.length; ++i) {
+    if (actualValue[i] !== expectedValue[i]) {
+      if (
+        (actualValue[i] === '+' && expectedValue[i] === '-') ||
+        (actualValue[i] === '/' && expectedValue[i] === '_')
+      ) {
+        continue
+      }
+      return false
+    }
+  }
+
+  return true
 }
 
 // https://w3c.github.io/webappsec-upgrade-insecure-requests/#upgrade-request
@@ -69415,7 +66329,8 @@ module.exports = {
   urlHasHttpsScheme,
   urlIsHttpHttpsScheme,
   readAllBytes,
-  normalizeMethodRecord
+  normalizeMethodRecord,
+  parseMetadata
 }
 
 
@@ -71502,12 +68417,17 @@ function parseLocation (statusCode, headers) {
 
 // https://tools.ietf.org/html/rfc7231#section-6.4.4
 function shouldRemoveHeader (header, removeContent, unknownOrigin) {
-  return (
-    (header.length === 4 && header.toString().toLowerCase() === 'host') ||
-    (removeContent && header.toString().toLowerCase().indexOf('content-') === 0) ||
-    (unknownOrigin && header.length === 13 && header.toString().toLowerCase() === 'authorization') ||
-    (unknownOrigin && header.length === 6 && header.toString().toLowerCase() === 'cookie')
-  )
+  if (header.length === 4) {
+    return util.headerNameToString(header) === 'host'
+  }
+  if (removeContent && util.headerNameToString(header).startsWith('content-')) {
+    return true
+  }
+  if (unknownOrigin && (header.length === 13 || header.length === 6 || header.length === 19)) {
+    const name = util.headerNameToString(header)
+    return name === 'authorization' || name === 'cookie' || name === 'proxy-authorization'
+  }
+  return false
 }
 
 // https://tools.ietf.org/html/rfc7231#section-6.4
@@ -83312,6 +80232,22 @@ module.exports = require("node:events");
 
 /***/ }),
 
+/***/ 612:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("node:os");
+
+/***/ }),
+
+/***/ 7742:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("node:process");
+
+/***/ }),
+
 /***/ 4492:
 /***/ ((module) => {
 
@@ -83445,6 +80381,2532 @@ module.exports = require("worker_threads");
 
 "use strict";
 module.exports = require("zlib");
+
+/***/ }),
+
+/***/ 8580:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.AzureKeyCredential = void 0;
+/**
+ * A static-key-based credential that supports updating
+ * the underlying key value.
+ */
+class AzureKeyCredential {
+    /**
+     * The value of the key to be used in authentication
+     */
+    get key() {
+        return this._key;
+    }
+    /**
+     * Create an instance of an AzureKeyCredential for use
+     * with a service client.
+     *
+     * @param key - The initial value of the key to use in authentication
+     */
+    constructor(key) {
+        if (!key) {
+            throw new Error("key must be a non-empty string");
+        }
+        this._key = key;
+    }
+    /**
+     * Change the value of the key.
+     *
+     * Updates will take effect upon the next request after
+     * updating the key value.
+     *
+     * @param newKey - The new key value to be used
+     */
+    update(newKey) {
+        this._key = newKey;
+    }
+}
+exports.AzureKeyCredential = AzureKeyCredential;
+//# sourceMappingURL=azureKeyCredential.js.map
+
+/***/ }),
+
+/***/ 4659:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isNamedKeyCredential = exports.AzureNamedKeyCredential = void 0;
+const core_util_1 = __nccwpck_require__(7409);
+/**
+ * A static name/key-based credential that supports updating
+ * the underlying name and key values.
+ */
+class AzureNamedKeyCredential {
+    /**
+     * The value of the key to be used in authentication.
+     */
+    get key() {
+        return this._key;
+    }
+    /**
+     * The value of the name to be used in authentication.
+     */
+    get name() {
+        return this._name;
+    }
+    /**
+     * Create an instance of an AzureNamedKeyCredential for use
+     * with a service client.
+     *
+     * @param name - The initial value of the name to use in authentication.
+     * @param key - The initial value of the key to use in authentication.
+     */
+    constructor(name, key) {
+        if (!name || !key) {
+            throw new TypeError("name and key must be non-empty strings");
+        }
+        this._name = name;
+        this._key = key;
+    }
+    /**
+     * Change the value of the key.
+     *
+     * Updates will take effect upon the next request after
+     * updating the key value.
+     *
+     * @param newName - The new name value to be used.
+     * @param newKey - The new key value to be used.
+     */
+    update(newName, newKey) {
+        if (!newName || !newKey) {
+            throw new TypeError("newName and newKey must be non-empty strings");
+        }
+        this._name = newName;
+        this._key = newKey;
+    }
+}
+exports.AzureNamedKeyCredential = AzureNamedKeyCredential;
+/**
+ * Tests an object to determine whether it implements NamedKeyCredential.
+ *
+ * @param credential - The assumed NamedKeyCredential to be tested.
+ */
+function isNamedKeyCredential(credential) {
+    return ((0, core_util_1.isObjectWithProperties)(credential, ["name", "key"]) &&
+        typeof credential.key === "string" &&
+        typeof credential.name === "string");
+}
+exports.isNamedKeyCredential = isNamedKeyCredential;
+//# sourceMappingURL=azureNamedKeyCredential.js.map
+
+/***/ }),
+
+/***/ 1895:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isSASCredential = exports.AzureSASCredential = void 0;
+const core_util_1 = __nccwpck_require__(7409);
+/**
+ * A static-signature-based credential that supports updating
+ * the underlying signature value.
+ */
+class AzureSASCredential {
+    /**
+     * The value of the shared access signature to be used in authentication
+     */
+    get signature() {
+        return this._signature;
+    }
+    /**
+     * Create an instance of an AzureSASCredential for use
+     * with a service client.
+     *
+     * @param signature - The initial value of the shared access signature to use in authentication
+     */
+    constructor(signature) {
+        if (!signature) {
+            throw new Error("shared access signature must be a non-empty string");
+        }
+        this._signature = signature;
+    }
+    /**
+     * Change the value of the signature.
+     *
+     * Updates will take effect upon the next request after
+     * updating the signature value.
+     *
+     * @param newSignature - The new shared access signature value to be used
+     */
+    update(newSignature) {
+        if (!newSignature) {
+            throw new Error("shared access signature must be a non-empty string");
+        }
+        this._signature = newSignature;
+    }
+}
+exports.AzureSASCredential = AzureSASCredential;
+/**
+ * Tests an object to determine whether it implements SASCredential.
+ *
+ * @param credential - The assumed SASCredential to be tested.
+ */
+function isSASCredential(credential) {
+    return ((0, core_util_1.isObjectWithProperties)(credential, ["signature"]) && typeof credential.signature === "string");
+}
+exports.isSASCredential = isSASCredential;
+//# sourceMappingURL=azureSASCredential.js.map
+
+/***/ }),
+
+/***/ 6411:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isTokenCredential = exports.isSASCredential = exports.AzureSASCredential = exports.isNamedKeyCredential = exports.AzureNamedKeyCredential = exports.isKeyCredential = exports.AzureKeyCredential = void 0;
+var azureKeyCredential_js_1 = __nccwpck_require__(8580);
+Object.defineProperty(exports, "AzureKeyCredential", ({ enumerable: true, get: function () { return azureKeyCredential_js_1.AzureKeyCredential; } }));
+var keyCredential_js_1 = __nccwpck_require__(7769);
+Object.defineProperty(exports, "isKeyCredential", ({ enumerable: true, get: function () { return keyCredential_js_1.isKeyCredential; } }));
+var azureNamedKeyCredential_js_1 = __nccwpck_require__(4659);
+Object.defineProperty(exports, "AzureNamedKeyCredential", ({ enumerable: true, get: function () { return azureNamedKeyCredential_js_1.AzureNamedKeyCredential; } }));
+Object.defineProperty(exports, "isNamedKeyCredential", ({ enumerable: true, get: function () { return azureNamedKeyCredential_js_1.isNamedKeyCredential; } }));
+var azureSASCredential_js_1 = __nccwpck_require__(1895);
+Object.defineProperty(exports, "AzureSASCredential", ({ enumerable: true, get: function () { return azureSASCredential_js_1.AzureSASCredential; } }));
+Object.defineProperty(exports, "isSASCredential", ({ enumerable: true, get: function () { return azureSASCredential_js_1.isSASCredential; } }));
+var tokenCredential_js_1 = __nccwpck_require__(8479);
+Object.defineProperty(exports, "isTokenCredential", ({ enumerable: true, get: function () { return tokenCredential_js_1.isTokenCredential; } }));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 7769:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isKeyCredential = void 0;
+const core_util_1 = __nccwpck_require__(7409);
+/**
+ * Tests an object to determine whether it implements KeyCredential.
+ *
+ * @param credential - The assumed KeyCredential to be tested.
+ */
+function isKeyCredential(credential) {
+    return (0, core_util_1.isObjectWithProperties)(credential, ["key"]) && typeof credential.key === "string";
+}
+exports.isKeyCredential = isKeyCredential;
+//# sourceMappingURL=keyCredential.js.map
+
+/***/ }),
+
+/***/ 8479:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isTokenCredential = void 0;
+/**
+ * Tests an object to determine whether it implements TokenCredential.
+ *
+ * @param credential - The assumed TokenCredential to be tested.
+ */
+function isTokenCredential(credential) {
+    // Check for an object with a 'getToken' function and possibly with
+    // a 'signRequest' function.  We do this check to make sure that
+    // a ServiceClientCredentials implementor (like TokenClientCredentials
+    // in ms-rest-nodeauth) doesn't get mistaken for a TokenCredential if
+    // it doesn't actually implement TokenCredential also.
+    const castCredential = credential;
+    return (castCredential &&
+        typeof castCredential.getToken === "function" &&
+        (castCredential.signRequest === undefined || castCredential.getToken.length > 0));
+}
+exports.isTokenCredential = isTokenCredential;
+//# sourceMappingURL=tokenCredential.js.map
+
+/***/ }),
+
+/***/ 9662:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.pollHttpOperation = exports.isOperationError = exports.getResourceLocation = exports.getOperationStatus = exports.getOperationLocation = exports.initHttpOperation = exports.getStatusFromInitialResponse = exports.getErrorFromResponse = exports.parseRetryAfter = exports.inferLroMode = void 0;
+const operation_js_1 = __nccwpck_require__(6552);
+const logger_js_1 = __nccwpck_require__(8561);
+function getOperationLocationPollingUrl(inputs) {
+    const { azureAsyncOperation, operationLocation } = inputs;
+    return operationLocation !== null && operationLocation !== void 0 ? operationLocation : azureAsyncOperation;
+}
+function getLocationHeader(rawResponse) {
+    return rawResponse.headers["location"];
+}
+function getOperationLocationHeader(rawResponse) {
+    return rawResponse.headers["operation-location"];
+}
+function getAzureAsyncOperationHeader(rawResponse) {
+    return rawResponse.headers["azure-asyncoperation"];
+}
+function findResourceLocation(inputs) {
+    var _a;
+    const { location, requestMethod, requestPath, resourceLocationConfig } = inputs;
+    switch (requestMethod) {
+        case "PUT": {
+            return requestPath;
+        }
+        case "DELETE": {
+            return undefined;
+        }
+        case "PATCH": {
+            return (_a = getDefault()) !== null && _a !== void 0 ? _a : requestPath;
+        }
+        default: {
+            return getDefault();
+        }
+    }
+    function getDefault() {
+        switch (resourceLocationConfig) {
+            case "azure-async-operation": {
+                return undefined;
+            }
+            case "original-uri": {
+                return requestPath;
+            }
+            case "location":
+            default: {
+                return location;
+            }
+        }
+    }
+}
+function inferLroMode(inputs) {
+    const { rawResponse, requestMethod, requestPath, resourceLocationConfig } = inputs;
+    const operationLocation = getOperationLocationHeader(rawResponse);
+    const azureAsyncOperation = getAzureAsyncOperationHeader(rawResponse);
+    const pollingUrl = getOperationLocationPollingUrl({ operationLocation, azureAsyncOperation });
+    const location = getLocationHeader(rawResponse);
+    const normalizedRequestMethod = requestMethod === null || requestMethod === void 0 ? void 0 : requestMethod.toLocaleUpperCase();
+    if (pollingUrl !== undefined) {
+        return {
+            mode: "OperationLocation",
+            operationLocation: pollingUrl,
+            resourceLocation: findResourceLocation({
+                requestMethod: normalizedRequestMethod,
+                location,
+                requestPath,
+                resourceLocationConfig,
+            }),
+        };
+    }
+    else if (location !== undefined) {
+        return {
+            mode: "ResourceLocation",
+            operationLocation: location,
+        };
+    }
+    else if (normalizedRequestMethod === "PUT" && requestPath) {
+        return {
+            mode: "Body",
+            operationLocation: requestPath,
+        };
+    }
+    else {
+        return undefined;
+    }
+}
+exports.inferLroMode = inferLroMode;
+function transformStatus(inputs) {
+    const { status, statusCode } = inputs;
+    if (typeof status !== "string" && status !== undefined) {
+        throw new Error(`Polling was unsuccessful. Expected status to have a string value or no value but it has instead: ${status}. This doesn't necessarily indicate the operation has failed. Check your Azure subscription or resource status for more information.`);
+    }
+    switch (status === null || status === void 0 ? void 0 : status.toLocaleLowerCase()) {
+        case undefined:
+            return toOperationStatus(statusCode);
+        case "succeeded":
+            return "succeeded";
+        case "failed":
+            return "failed";
+        case "running":
+        case "accepted":
+        case "started":
+        case "canceling":
+        case "cancelling":
+            return "running";
+        case "canceled":
+        case "cancelled":
+            return "canceled";
+        default: {
+            logger_js_1.logger.verbose(`LRO: unrecognized operation status: ${status}`);
+            return status;
+        }
+    }
+}
+function getStatus(rawResponse) {
+    var _a;
+    const { status } = (_a = rawResponse.body) !== null && _a !== void 0 ? _a : {};
+    return transformStatus({ status, statusCode: rawResponse.statusCode });
+}
+function getProvisioningState(rawResponse) {
+    var _a, _b;
+    const { properties, provisioningState } = (_a = rawResponse.body) !== null && _a !== void 0 ? _a : {};
+    const status = (_b = properties === null || properties === void 0 ? void 0 : properties.provisioningState) !== null && _b !== void 0 ? _b : provisioningState;
+    return transformStatus({ status, statusCode: rawResponse.statusCode });
+}
+function toOperationStatus(statusCode) {
+    if (statusCode === 202) {
+        return "running";
+    }
+    else if (statusCode < 300) {
+        return "succeeded";
+    }
+    else {
+        return "failed";
+    }
+}
+function parseRetryAfter({ rawResponse }) {
+    const retryAfter = rawResponse.headers["retry-after"];
+    if (retryAfter !== undefined) {
+        // Retry-After header value is either in HTTP date format, or in seconds
+        const retryAfterInSeconds = parseInt(retryAfter);
+        return isNaN(retryAfterInSeconds)
+            ? calculatePollingIntervalFromDate(new Date(retryAfter))
+            : retryAfterInSeconds * 1000;
+    }
+    return undefined;
+}
+exports.parseRetryAfter = parseRetryAfter;
+function getErrorFromResponse(response) {
+    const error = accessBodyProperty(response, "error");
+    if (!error) {
+        logger_js_1.logger.warning(`The long-running operation failed but there is no error property in the response's body`);
+        return;
+    }
+    if (!error.code || !error.message) {
+        logger_js_1.logger.warning(`The long-running operation failed but the error property in the response's body doesn't contain code or message`);
+        return;
+    }
+    return error;
+}
+exports.getErrorFromResponse = getErrorFromResponse;
+function calculatePollingIntervalFromDate(retryAfterDate) {
+    const timeNow = Math.floor(new Date().getTime());
+    const retryAfterTime = retryAfterDate.getTime();
+    if (timeNow < retryAfterTime) {
+        return retryAfterTime - timeNow;
+    }
+    return undefined;
+}
+function getStatusFromInitialResponse(inputs) {
+    const { response, state, operationLocation } = inputs;
+    function helper() {
+        var _a;
+        const mode = (_a = state.config.metadata) === null || _a === void 0 ? void 0 : _a["mode"];
+        switch (mode) {
+            case undefined:
+                return toOperationStatus(response.rawResponse.statusCode);
+            case "Body":
+                return getOperationStatus(response, state);
+            default:
+                return "running";
+        }
+    }
+    const status = helper();
+    return status === "running" && operationLocation === undefined ? "succeeded" : status;
+}
+exports.getStatusFromInitialResponse = getStatusFromInitialResponse;
+/**
+ * Initiates the long-running operation.
+ */
+async function initHttpOperation(inputs) {
+    const { stateProxy, resourceLocationConfig, processResult, lro, setErrorAsResult } = inputs;
+    return (0, operation_js_1.initOperation)({
+        init: async () => {
+            const response = await lro.sendInitialRequest();
+            const config = inferLroMode({
+                rawResponse: response.rawResponse,
+                requestPath: lro.requestPath,
+                requestMethod: lro.requestMethod,
+                resourceLocationConfig,
+            });
+            return Object.assign({ response, operationLocation: config === null || config === void 0 ? void 0 : config.operationLocation, resourceLocation: config === null || config === void 0 ? void 0 : config.resourceLocation }, ((config === null || config === void 0 ? void 0 : config.mode) ? { metadata: { mode: config.mode } } : {}));
+        },
+        stateProxy,
+        processResult: processResult
+            ? ({ flatResponse }, state) => processResult(flatResponse, state)
+            : ({ flatResponse }) => flatResponse,
+        getOperationStatus: getStatusFromInitialResponse,
+        setErrorAsResult,
+    });
+}
+exports.initHttpOperation = initHttpOperation;
+function getOperationLocation({ rawResponse }, state) {
+    var _a;
+    const mode = (_a = state.config.metadata) === null || _a === void 0 ? void 0 : _a["mode"];
+    switch (mode) {
+        case "OperationLocation": {
+            return getOperationLocationPollingUrl({
+                operationLocation: getOperationLocationHeader(rawResponse),
+                azureAsyncOperation: getAzureAsyncOperationHeader(rawResponse),
+            });
+        }
+        case "ResourceLocation": {
+            return getLocationHeader(rawResponse);
+        }
+        case "Body":
+        default: {
+            return undefined;
+        }
+    }
+}
+exports.getOperationLocation = getOperationLocation;
+function getOperationStatus({ rawResponse }, state) {
+    var _a;
+    const mode = (_a = state.config.metadata) === null || _a === void 0 ? void 0 : _a["mode"];
+    switch (mode) {
+        case "OperationLocation": {
+            return getStatus(rawResponse);
+        }
+        case "ResourceLocation": {
+            return toOperationStatus(rawResponse.statusCode);
+        }
+        case "Body": {
+            return getProvisioningState(rawResponse);
+        }
+        default:
+            throw new Error(`Internal error: Unexpected operation mode: ${mode}`);
+    }
+}
+exports.getOperationStatus = getOperationStatus;
+function accessBodyProperty({ flatResponse, rawResponse }, prop) {
+    var _a, _b;
+    return (_a = flatResponse === null || flatResponse === void 0 ? void 0 : flatResponse[prop]) !== null && _a !== void 0 ? _a : (_b = rawResponse.body) === null || _b === void 0 ? void 0 : _b[prop];
+}
+function getResourceLocation(res, state) {
+    const loc = accessBodyProperty(res, "resourceLocation");
+    if (loc && typeof loc === "string") {
+        state.config.resourceLocation = loc;
+    }
+    return state.config.resourceLocation;
+}
+exports.getResourceLocation = getResourceLocation;
+function isOperationError(e) {
+    return e.name === "RestError";
+}
+exports.isOperationError = isOperationError;
+/** Polls the long-running operation. */
+async function pollHttpOperation(inputs) {
+    const { lro, stateProxy, options, processResult, updateState, setDelay, state, setErrorAsResult, } = inputs;
+    return (0, operation_js_1.pollOperation)({
+        state,
+        stateProxy,
+        setDelay,
+        processResult: processResult
+            ? ({ flatResponse }, inputState) => processResult(flatResponse, inputState)
+            : ({ flatResponse }) => flatResponse,
+        getError: getErrorFromResponse,
+        updateState,
+        getPollingInterval: parseRetryAfter,
+        getOperationLocation,
+        getOperationStatus,
+        isOperationError,
+        getResourceLocation,
+        options,
+        /**
+         * The expansion here is intentional because `lro` could be an object that
+         * references an inner this, so we need to preserve a reference to it.
+         */
+        poll: async (location, inputOptions) => lro.sendPollRequest(location, inputOptions),
+        setErrorAsResult,
+    });
+}
+exports.pollHttpOperation = pollHttpOperation;
+//# sourceMappingURL=operation.js.map
+
+/***/ }),
+
+/***/ 7144:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createHttpPoller = void 0;
+const operation_js_1 = __nccwpck_require__(9662);
+const poller_js_1 = __nccwpck_require__(5488);
+/**
+ * Creates a poller that can be used to poll a long-running operation.
+ * @param lro - Description of the long-running operation
+ * @param options - options to configure the poller
+ * @returns an initialized poller
+ */
+async function createHttpPoller(lro, options) {
+    const { resourceLocationConfig, intervalInMs, processResult, restoreFrom, updateState, withOperationLocation, resolveOnUnsuccessful = false, } = options || {};
+    return (0, poller_js_1.buildCreatePoller)({
+        getStatusFromInitialResponse: operation_js_1.getStatusFromInitialResponse,
+        getStatusFromPollResponse: operation_js_1.getOperationStatus,
+        isOperationError: operation_js_1.isOperationError,
+        getOperationLocation: operation_js_1.getOperationLocation,
+        getResourceLocation: operation_js_1.getResourceLocation,
+        getPollingInterval: operation_js_1.parseRetryAfter,
+        getError: operation_js_1.getErrorFromResponse,
+        resolveOnUnsuccessful,
+    })({
+        init: async () => {
+            const response = await lro.sendInitialRequest();
+            const config = (0, operation_js_1.inferLroMode)({
+                rawResponse: response.rawResponse,
+                requestPath: lro.requestPath,
+                requestMethod: lro.requestMethod,
+                resourceLocationConfig,
+            });
+            return Object.assign({ response, operationLocation: config === null || config === void 0 ? void 0 : config.operationLocation, resourceLocation: config === null || config === void 0 ? void 0 : config.resourceLocation }, ((config === null || config === void 0 ? void 0 : config.mode) ? { metadata: { mode: config.mode } } : {}));
+        },
+        poll: lro.sendPollRequest,
+    }, {
+        intervalInMs,
+        withOperationLocation,
+        restoreFrom,
+        updateState,
+        processResult: processResult
+            ? ({ flatResponse }, state) => processResult(flatResponse, state)
+            : ({ flatResponse }) => flatResponse,
+    });
+}
+exports.createHttpPoller = createHttpPoller;
+//# sourceMappingURL=poller.js.map
+
+/***/ }),
+
+/***/ 2173:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createHttpPoller = void 0;
+const tslib_1 = __nccwpck_require__(36);
+var poller_js_1 = __nccwpck_require__(7144);
+Object.defineProperty(exports, "createHttpPoller", ({ enumerable: true, get: function () { return poller_js_1.createHttpPoller; } }));
+/**
+ * This can be uncommented to expose the protocol-agnostic poller
+ */
+// export {
+//   BuildCreatePollerOptions,
+//   Operation,
+//   CreatePollerOptions,
+//   OperationConfig,
+//   RestorableOperationState,
+// } from "./poller/models";
+// export { buildCreatePoller } from "./poller/poller";
+/** legacy */
+tslib_1.__exportStar(__nccwpck_require__(1146), exports);
+tslib_1.__exportStar(__nccwpck_require__(622), exports);
+tslib_1.__exportStar(__nccwpck_require__(1152), exports);
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 1146:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.LroEngine = void 0;
+var lroEngine_js_1 = __nccwpck_require__(6041);
+Object.defineProperty(exports, "LroEngine", ({ enumerable: true, get: function () { return lroEngine_js_1.LroEngine; } }));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 6041:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.LroEngine = void 0;
+const operation_js_1 = __nccwpck_require__(8583);
+const constants_js_1 = __nccwpck_require__(2443);
+const poller_js_1 = __nccwpck_require__(622);
+const operation_js_2 = __nccwpck_require__(6552);
+/**
+ * The LRO Engine, a class that performs polling.
+ */
+class LroEngine extends poller_js_1.Poller {
+    constructor(lro, options) {
+        const { intervalInMs = constants_js_1.POLL_INTERVAL_IN_MS, resumeFrom, resolveOnUnsuccessful = false, isDone, lroResourceLocationConfig, processResult, updateState, } = options || {};
+        const state = resumeFrom
+            ? (0, operation_js_2.deserializeState)(resumeFrom)
+            : {};
+        const operation = new operation_js_1.GenericPollOperation(state, lro, !resolveOnUnsuccessful, lroResourceLocationConfig, processResult, updateState, isDone);
+        super(operation);
+        this.resolveOnUnsuccessful = resolveOnUnsuccessful;
+        this.config = { intervalInMs: intervalInMs };
+        operation.setPollerConfig(this.config);
+    }
+    /**
+     * The method used by the poller to wait before attempting to update its operation.
+     */
+    delay() {
+        return new Promise((resolve) => setTimeout(() => resolve(), this.config.intervalInMs));
+    }
+}
+exports.LroEngine = LroEngine;
+//# sourceMappingURL=lroEngine.js.map
+
+/***/ }),
+
+/***/ 8583:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.GenericPollOperation = void 0;
+const operation_js_1 = __nccwpck_require__(9662);
+const logger_js_1 = __nccwpck_require__(8561);
+const createStateProxy = () => ({
+    initState: (config) => ({ config, isStarted: true }),
+    setCanceled: (state) => (state.isCancelled = true),
+    setError: (state, error) => (state.error = error),
+    setResult: (state, result) => (state.result = result),
+    setRunning: (state) => (state.isStarted = true),
+    setSucceeded: (state) => (state.isCompleted = true),
+    setFailed: () => {
+        /** empty body */
+    },
+    getError: (state) => state.error,
+    getResult: (state) => state.result,
+    isCanceled: (state) => !!state.isCancelled,
+    isFailed: (state) => !!state.error,
+    isRunning: (state) => !!state.isStarted,
+    isSucceeded: (state) => Boolean(state.isCompleted && !state.isCancelled && !state.error),
+});
+class GenericPollOperation {
+    constructor(state, lro, setErrorAsResult, lroResourceLocationConfig, processResult, updateState, isDone) {
+        this.state = state;
+        this.lro = lro;
+        this.setErrorAsResult = setErrorAsResult;
+        this.lroResourceLocationConfig = lroResourceLocationConfig;
+        this.processResult = processResult;
+        this.updateState = updateState;
+        this.isDone = isDone;
+    }
+    setPollerConfig(pollerConfig) {
+        this.pollerConfig = pollerConfig;
+    }
+    async update(options) {
+        var _a;
+        const stateProxy = createStateProxy();
+        if (!this.state.isStarted) {
+            this.state = Object.assign(Object.assign({}, this.state), (await (0, operation_js_1.initHttpOperation)({
+                lro: this.lro,
+                stateProxy,
+                resourceLocationConfig: this.lroResourceLocationConfig,
+                processResult: this.processResult,
+                setErrorAsResult: this.setErrorAsResult,
+            })));
+        }
+        const updateState = this.updateState;
+        const isDone = this.isDone;
+        if (!this.state.isCompleted && this.state.error === undefined) {
+            await (0, operation_js_1.pollHttpOperation)({
+                lro: this.lro,
+                state: this.state,
+                stateProxy,
+                processResult: this.processResult,
+                updateState: updateState
+                    ? (state, { rawResponse }) => updateState(state, rawResponse)
+                    : undefined,
+                isDone: isDone
+                    ? ({ flatResponse }, state) => isDone(flatResponse, state)
+                    : undefined,
+                options,
+                setDelay: (intervalInMs) => {
+                    this.pollerConfig.intervalInMs = intervalInMs;
+                },
+                setErrorAsResult: this.setErrorAsResult,
+            });
+        }
+        (_a = options === null || options === void 0 ? void 0 : options.fireProgress) === null || _a === void 0 ? void 0 : _a.call(options, this.state);
+        return this;
+    }
+    async cancel() {
+        logger_js_1.logger.error("`cancelOperation` is deprecated because it wasn't implemented");
+        return this;
+    }
+    /**
+     * Serializes the Poller operation.
+     */
+    toString() {
+        return JSON.stringify({
+            state: this.state,
+        });
+    }
+}
+exports.GenericPollOperation = GenericPollOperation;
+//# sourceMappingURL=operation.js.map
+
+/***/ }),
+
+/***/ 1152:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=pollOperation.js.map
+
+/***/ }),
+
+/***/ 622:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Poller = exports.PollerCancelledError = exports.PollerStoppedError = void 0;
+/**
+ * When a poller is manually stopped through the `stopPolling` method,
+ * the poller will be rejected with an instance of the PollerStoppedError.
+ */
+class PollerStoppedError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "PollerStoppedError";
+        Object.setPrototypeOf(this, PollerStoppedError.prototype);
+    }
+}
+exports.PollerStoppedError = PollerStoppedError;
+/**
+ * When the operation is cancelled, the poller will be rejected with an instance
+ * of the PollerCancelledError.
+ */
+class PollerCancelledError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "PollerCancelledError";
+        Object.setPrototypeOf(this, PollerCancelledError.prototype);
+    }
+}
+exports.PollerCancelledError = PollerCancelledError;
+/**
+ * A class that represents the definition of a program that polls through consecutive requests
+ * until it reaches a state of completion.
+ *
+ * A poller can be executed manually, by polling request by request by calling to the `poll()` method repeatedly, until its operation is completed.
+ * It also provides a way to wait until the operation completes, by calling `pollUntilDone()` and waiting until the operation finishes.
+ * Pollers can also request the cancellation of the ongoing process to whom is providing the underlying long running operation.
+ *
+ * ```ts
+ * const poller = new MyPoller();
+ *
+ * // Polling just once:
+ * await poller.poll();
+ *
+ * // We can try to cancel the request here, by calling:
+ * //
+ * //     await poller.cancelOperation();
+ * //
+ *
+ * // Getting the final result:
+ * const result = await poller.pollUntilDone();
+ * ```
+ *
+ * The Poller is defined by two types, a type representing the state of the poller, which
+ * must include a basic set of properties from `PollOperationState<TResult>`,
+ * and a return type defined by `TResult`, which can be anything.
+ *
+ * The Poller class implements the `PollerLike` interface, which allows poller implementations to avoid having
+ * to export the Poller's class directly, and instead only export the already instantiated poller with the PollerLike type.
+ *
+ * ```ts
+ * class Client {
+ *   public async makePoller: PollerLike<MyOperationState, MyResult> {
+ *     const poller = new MyPoller({});
+ *     // It might be preferred to return the poller after the first request is made,
+ *     // so that some information can be obtained right away.
+ *     await poller.poll();
+ *     return poller;
+ *   }
+ * }
+ *
+ * const poller: PollerLike<MyOperationState, MyResult> = myClient.makePoller();
+ * ```
+ *
+ * A poller can be created through its constructor, then it can be polled until it's completed.
+ * At any point in time, the state of the poller can be obtained without delay through the getOperationState method.
+ * At any point in time, the intermediate forms of the result type can be requested without delay.
+ * Once the underlying operation is marked as completed, the poller will stop and the final value will be returned.
+ *
+ * ```ts
+ * const poller = myClient.makePoller();
+ * const state: MyOperationState = poller.getOperationState();
+ *
+ * // The intermediate result can be obtained at any time.
+ * const result: MyResult | undefined = poller.getResult();
+ *
+ * // The final result can only be obtained after the poller finishes.
+ * const result: MyResult = await poller.pollUntilDone();
+ * ```
+ *
+ */
+// eslint-disable-next-line no-use-before-define
+class Poller {
+    /**
+     * A poller needs to be initialized by passing in at least the basic properties of the `PollOperation<TState, TResult>`.
+     *
+     * When writing an implementation of a Poller, this implementation needs to deal with the initialization
+     * of any custom state beyond the basic definition of the poller. The basic poller assumes that the poller's
+     * operation has already been defined, at least its basic properties. The code below shows how to approach
+     * the definition of the constructor of a new custom poller.
+     *
+     * ```ts
+     * export class MyPoller extends Poller<MyOperationState, string> {
+     *   constructor({
+     *     // Anything you might need outside of the basics
+     *   }) {
+     *     let state: MyOperationState = {
+     *       privateProperty: private,
+     *       publicProperty: public,
+     *     };
+     *
+     *     const operation = {
+     *       state,
+     *       update,
+     *       cancel,
+     *       toString
+     *     }
+     *
+     *     // Sending the operation to the parent's constructor.
+     *     super(operation);
+     *
+     *     // You can assign more local properties here.
+     *   }
+     * }
+     * ```
+     *
+     * Inside of this constructor, a new promise is created. This will be used to
+     * tell the user when the poller finishes (see `pollUntilDone()`). The promise's
+     * resolve and reject methods are also used internally to control when to resolve
+     * or reject anyone waiting for the poller to finish.
+     *
+     * The constructor of a custom implementation of a poller is where any serialized version of
+     * a previous poller's operation should be deserialized into the operation sent to the
+     * base constructor. For example:
+     *
+     * ```ts
+     * export class MyPoller extends Poller<MyOperationState, string> {
+     *   constructor(
+     *     baseOperation: string | undefined
+     *   ) {
+     *     let state: MyOperationState = {};
+     *     if (baseOperation) {
+     *       state = {
+     *         ...JSON.parse(baseOperation).state,
+     *         ...state
+     *       };
+     *     }
+     *     const operation = {
+     *       state,
+     *       // ...
+     *     }
+     *     super(operation);
+     *   }
+     * }
+     * ```
+     *
+     * @param operation - Must contain the basic properties of `PollOperation<State, TResult>`.
+     */
+    constructor(operation) {
+        /** controls whether to throw an error if the operation failed or was canceled. */
+        this.resolveOnUnsuccessful = false;
+        this.stopped = true;
+        this.pollProgressCallbacks = [];
+        this.operation = operation;
+        this.promise = new Promise((resolve, reject) => {
+            this.resolve = resolve;
+            this.reject = reject;
+        });
+        // This prevents the UnhandledPromiseRejectionWarning in node.js from being thrown.
+        // The above warning would get thrown if `poller.poll` is called, it returns an error,
+        // and pullUntilDone did not have a .catch or await try/catch on it's return value.
+        this.promise.catch(() => {
+            /* intentionally blank */
+        });
+    }
+    /**
+     * Starts a loop that will break only if the poller is done
+     * or if the poller is stopped.
+     */
+    async startPolling(pollOptions = {}) {
+        if (this.stopped) {
+            this.stopped = false;
+        }
+        while (!this.isStopped() && !this.isDone()) {
+            await this.poll(pollOptions);
+            await this.delay();
+        }
+    }
+    /**
+     * pollOnce does one polling, by calling to the update method of the underlying
+     * poll operation to make any relevant change effective.
+     *
+     * It only optionally receives an object with an abortSignal property, from \@azure/abort-controller's AbortSignalLike.
+     *
+     * @param options - Optional properties passed to the operation's update method.
+     */
+    async pollOnce(options = {}) {
+        if (!this.isDone()) {
+            this.operation = await this.operation.update({
+                abortSignal: options.abortSignal,
+                fireProgress: this.fireProgress.bind(this),
+            });
+        }
+        this.processUpdatedState();
+    }
+    /**
+     * fireProgress calls the functions passed in via onProgress the method of the poller.
+     *
+     * It loops over all of the callbacks received from onProgress, and executes them, sending them
+     * the current operation state.
+     *
+     * @param state - The current operation state.
+     */
+    fireProgress(state) {
+        for (const callback of this.pollProgressCallbacks) {
+            callback(state);
+        }
+    }
+    /**
+     * Invokes the underlying operation's cancel method.
+     */
+    async cancelOnce(options = {}) {
+        this.operation = await this.operation.cancel(options);
+    }
+    /**
+     * Returns a promise that will resolve once a single polling request finishes.
+     * It does this by calling the update method of the Poller's operation.
+     *
+     * It only optionally receives an object with an abortSignal property, from \@azure/abort-controller's AbortSignalLike.
+     *
+     * @param options - Optional properties passed to the operation's update method.
+     */
+    poll(options = {}) {
+        if (!this.pollOncePromise) {
+            this.pollOncePromise = this.pollOnce(options);
+            const clearPollOncePromise = () => {
+                this.pollOncePromise = undefined;
+            };
+            this.pollOncePromise.then(clearPollOncePromise, clearPollOncePromise).catch(this.reject);
+        }
+        return this.pollOncePromise;
+    }
+    processUpdatedState() {
+        if (this.operation.state.error) {
+            this.stopped = true;
+            if (!this.resolveOnUnsuccessful) {
+                this.reject(this.operation.state.error);
+                throw this.operation.state.error;
+            }
+        }
+        if (this.operation.state.isCancelled) {
+            this.stopped = true;
+            if (!this.resolveOnUnsuccessful) {
+                const error = new PollerCancelledError("Operation was canceled");
+                this.reject(error);
+                throw error;
+            }
+        }
+        if (this.isDone() && this.resolve) {
+            // If the poller has finished polling, this means we now have a result.
+            // However, it can be the case that TResult is instantiated to void, so
+            // we are not expecting a result anyway. To assert that we might not
+            // have a result eventually after finishing polling, we cast the result
+            // to TResult.
+            this.resolve(this.getResult());
+        }
+    }
+    /**
+     * Returns a promise that will resolve once the underlying operation is completed.
+     */
+    async pollUntilDone(pollOptions = {}) {
+        if (this.stopped) {
+            this.startPolling(pollOptions).catch(this.reject);
+        }
+        // This is needed because the state could have been updated by
+        // `cancelOperation`, e.g. the operation is canceled or an error occurred.
+        this.processUpdatedState();
+        return this.promise;
+    }
+    /**
+     * Invokes the provided callback after each polling is completed,
+     * sending the current state of the poller's operation.
+     *
+     * It returns a method that can be used to stop receiving updates on the given callback function.
+     */
+    onProgress(callback) {
+        this.pollProgressCallbacks.push(callback);
+        return () => {
+            this.pollProgressCallbacks = this.pollProgressCallbacks.filter((c) => c !== callback);
+        };
+    }
+    /**
+     * Returns true if the poller has finished polling.
+     */
+    isDone() {
+        const state = this.operation.state;
+        return Boolean(state.isCompleted || state.isCancelled || state.error);
+    }
+    /**
+     * Stops the poller from continuing to poll.
+     */
+    stopPolling() {
+        if (!this.stopped) {
+            this.stopped = true;
+            if (this.reject) {
+                this.reject(new PollerStoppedError("This poller is already stopped"));
+            }
+        }
+    }
+    /**
+     * Returns true if the poller is stopped.
+     */
+    isStopped() {
+        return this.stopped;
+    }
+    /**
+     * Attempts to cancel the underlying operation.
+     *
+     * It only optionally receives an object with an abortSignal property, from \@azure/abort-controller's AbortSignalLike.
+     *
+     * If it's called again before it finishes, it will throw an error.
+     *
+     * @param options - Optional properties passed to the operation's update method.
+     */
+    cancelOperation(options = {}) {
+        if (!this.cancelPromise) {
+            this.cancelPromise = this.cancelOnce(options);
+        }
+        else if (options.abortSignal) {
+            throw new Error("A cancel request is currently pending");
+        }
+        return this.cancelPromise;
+    }
+    /**
+     * Returns the state of the operation.
+     *
+     * Even though TState will be the same type inside any of the methods of any extension of the Poller class,
+     * implementations of the pollers can customize what's shared with the public by writing their own
+     * version of the `getOperationState` method, and by defining two types, one representing the internal state of the poller
+     * and a public type representing a safe to share subset of the properties of the internal state.
+     * Their definition of getOperationState can then return their public type.
+     *
+     * Example:
+     *
+     * ```ts
+     * // Let's say we have our poller's operation state defined as:
+     * interface MyOperationState extends PollOperationState<ResultType> {
+     *   privateProperty?: string;
+     *   publicProperty?: string;
+     * }
+     *
+     * // To allow us to have a true separation of public and private state, we have to define another interface:
+     * interface PublicState extends PollOperationState<ResultType> {
+     *   publicProperty?: string;
+     * }
+     *
+     * // Then, we define our Poller as follows:
+     * export class MyPoller extends Poller<MyOperationState, ResultType> {
+     *   // ... More content is needed here ...
+     *
+     *   public getOperationState(): PublicState {
+     *     const state: PublicState = this.operation.state;
+     *     return {
+     *       // Properties from PollOperationState<TResult>
+     *       isStarted: state.isStarted,
+     *       isCompleted: state.isCompleted,
+     *       isCancelled: state.isCancelled,
+     *       error: state.error,
+     *       result: state.result,
+     *
+     *       // The only other property needed by PublicState.
+     *       publicProperty: state.publicProperty
+     *     }
+     *   }
+     * }
+     * ```
+     *
+     * You can see this in the tests of this repository, go to the file:
+     * `../test/utils/testPoller.ts`
+     * and look for the getOperationState implementation.
+     */
+    getOperationState() {
+        return this.operation.state;
+    }
+    /**
+     * Returns the result value of the operation,
+     * regardless of the state of the poller.
+     * It can return undefined or an incomplete form of the final TResult value
+     * depending on the implementation.
+     */
+    getResult() {
+        const state = this.operation.state;
+        return state.result;
+    }
+    /**
+     * Returns a serialized version of the poller's operation
+     * by invoking the operation's toString method.
+     */
+    toString() {
+        return this.operation.toString();
+    }
+}
+exports.Poller = Poller;
+//# sourceMappingURL=poller.js.map
+
+/***/ }),
+
+/***/ 8561:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.logger = void 0;
+const logger_1 = __nccwpck_require__(865);
+/**
+ * The `@azure/logger` configuration for this package.
+ * @internal
+ */
+exports.logger = (0, logger_1.createClientLogger)("core-lro");
+//# sourceMappingURL=logger.js.map
+
+/***/ }),
+
+/***/ 2443:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.terminalStates = exports.POLL_INTERVAL_IN_MS = void 0;
+/**
+ * The default time interval to wait before sending the next polling request.
+ */
+exports.POLL_INTERVAL_IN_MS = 2000;
+/**
+ * The closed set of terminal states.
+ */
+exports.terminalStates = ["succeeded", "canceled", "failed"];
+//# sourceMappingURL=constants.js.map
+
+/***/ }),
+
+/***/ 6552:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.pollOperation = exports.initOperation = exports.deserializeState = void 0;
+const logger_js_1 = __nccwpck_require__(8561);
+const constants_js_1 = __nccwpck_require__(2443);
+/**
+ * Deserializes the state
+ */
+function deserializeState(serializedState) {
+    try {
+        return JSON.parse(serializedState).state;
+    }
+    catch (e) {
+        throw new Error(`Unable to deserialize input state: ${serializedState}`);
+    }
+}
+exports.deserializeState = deserializeState;
+function setStateError(inputs) {
+    const { state, stateProxy, isOperationError } = inputs;
+    return (error) => {
+        if (isOperationError(error)) {
+            stateProxy.setError(state, error);
+            stateProxy.setFailed(state);
+        }
+        throw error;
+    };
+}
+function appendReadableErrorMessage(currentMessage, innerMessage) {
+    let message = currentMessage;
+    if (message.slice(-1) !== ".") {
+        message = message + ".";
+    }
+    return message + " " + innerMessage;
+}
+function simplifyError(err) {
+    let message = err.message;
+    let code = err.code;
+    let curErr = err;
+    while (curErr.innererror) {
+        curErr = curErr.innererror;
+        code = curErr.code;
+        message = appendReadableErrorMessage(message, curErr.message);
+    }
+    return {
+        code,
+        message,
+    };
+}
+function processOperationStatus(result) {
+    const { state, stateProxy, status, isDone, processResult, getError, response, setErrorAsResult } = result;
+    switch (status) {
+        case "succeeded": {
+            stateProxy.setSucceeded(state);
+            break;
+        }
+        case "failed": {
+            const err = getError === null || getError === void 0 ? void 0 : getError(response);
+            let postfix = "";
+            if (err) {
+                const { code, message } = simplifyError(err);
+                postfix = `. ${code}. ${message}`;
+            }
+            const errStr = `The long-running operation has failed${postfix}`;
+            stateProxy.setError(state, new Error(errStr));
+            stateProxy.setFailed(state);
+            logger_js_1.logger.warning(errStr);
+            break;
+        }
+        case "canceled": {
+            stateProxy.setCanceled(state);
+            break;
+        }
+    }
+    if ((isDone === null || isDone === void 0 ? void 0 : isDone(response, state)) ||
+        (isDone === undefined &&
+            ["succeeded", "canceled"].concat(setErrorAsResult ? [] : ["failed"]).includes(status))) {
+        stateProxy.setResult(state, buildResult({
+            response,
+            state,
+            processResult,
+        }));
+    }
+}
+function buildResult(inputs) {
+    const { processResult, response, state } = inputs;
+    return processResult ? processResult(response, state) : response;
+}
+/**
+ * Initiates the long-running operation.
+ */
+async function initOperation(inputs) {
+    const { init, stateProxy, processResult, getOperationStatus, withOperationLocation, setErrorAsResult, } = inputs;
+    const { operationLocation, resourceLocation, metadata, response } = await init();
+    if (operationLocation)
+        withOperationLocation === null || withOperationLocation === void 0 ? void 0 : withOperationLocation(operationLocation, false);
+    const config = {
+        metadata,
+        operationLocation,
+        resourceLocation,
+    };
+    logger_js_1.logger.verbose(`LRO: Operation description:`, config);
+    const state = stateProxy.initState(config);
+    const status = getOperationStatus({ response, state, operationLocation });
+    processOperationStatus({ state, status, stateProxy, response, setErrorAsResult, processResult });
+    return state;
+}
+exports.initOperation = initOperation;
+async function pollOperationHelper(inputs) {
+    const { poll, state, stateProxy, operationLocation, getOperationStatus, getResourceLocation, isOperationError, options, } = inputs;
+    const response = await poll(operationLocation, options).catch(setStateError({
+        state,
+        stateProxy,
+        isOperationError,
+    }));
+    const status = getOperationStatus(response, state);
+    logger_js_1.logger.verbose(`LRO: Status:\n\tPolling from: ${state.config.operationLocation}\n\tOperation status: ${status}\n\tPolling status: ${constants_js_1.terminalStates.includes(status) ? "Stopped" : "Running"}`);
+    if (status === "succeeded") {
+        const resourceLocation = getResourceLocation(response, state);
+        if (resourceLocation !== undefined) {
+            return {
+                response: await poll(resourceLocation).catch(setStateError({ state, stateProxy, isOperationError })),
+                status,
+            };
+        }
+    }
+    return { response, status };
+}
+/** Polls the long-running operation. */
+async function pollOperation(inputs) {
+    const { poll, state, stateProxy, options, getOperationStatus, getResourceLocation, getOperationLocation, isOperationError, withOperationLocation, getPollingInterval, processResult, getError, updateState, setDelay, isDone, setErrorAsResult, } = inputs;
+    const { operationLocation } = state.config;
+    if (operationLocation !== undefined) {
+        const { response, status } = await pollOperationHelper({
+            poll,
+            getOperationStatus,
+            state,
+            stateProxy,
+            operationLocation,
+            getResourceLocation,
+            isOperationError,
+            options,
+        });
+        processOperationStatus({
+            status,
+            response,
+            state,
+            stateProxy,
+            isDone,
+            processResult,
+            getError,
+            setErrorAsResult,
+        });
+        if (!constants_js_1.terminalStates.includes(status)) {
+            const intervalInMs = getPollingInterval === null || getPollingInterval === void 0 ? void 0 : getPollingInterval(response);
+            if (intervalInMs)
+                setDelay(intervalInMs);
+            const location = getOperationLocation === null || getOperationLocation === void 0 ? void 0 : getOperationLocation(response, state);
+            if (location !== undefined) {
+                const isUpdated = operationLocation !== location;
+                state.config.operationLocation = location;
+                withOperationLocation === null || withOperationLocation === void 0 ? void 0 : withOperationLocation(location, isUpdated);
+            }
+            else
+                withOperationLocation === null || withOperationLocation === void 0 ? void 0 : withOperationLocation(operationLocation, false);
+        }
+        updateState === null || updateState === void 0 ? void 0 : updateState(state, response);
+    }
+}
+exports.pollOperation = pollOperation;
+//# sourceMappingURL=operation.js.map
+
+/***/ }),
+
+/***/ 5488:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.buildCreatePoller = void 0;
+const operation_js_1 = __nccwpck_require__(6552);
+const constants_js_1 = __nccwpck_require__(2443);
+const core_util_1 = __nccwpck_require__(7409);
+const createStateProxy = () => ({
+    /**
+     * The state at this point is created to be of type OperationState<TResult>.
+     * It will be updated later to be of type TState when the
+     * customer-provided callback, `updateState`, is called during polling.
+     */
+    initState: (config) => ({ status: "running", config }),
+    setCanceled: (state) => (state.status = "canceled"),
+    setError: (state, error) => (state.error = error),
+    setResult: (state, result) => (state.result = result),
+    setRunning: (state) => (state.status = "running"),
+    setSucceeded: (state) => (state.status = "succeeded"),
+    setFailed: (state) => (state.status = "failed"),
+    getError: (state) => state.error,
+    getResult: (state) => state.result,
+    isCanceled: (state) => state.status === "canceled",
+    isFailed: (state) => state.status === "failed",
+    isRunning: (state) => state.status === "running",
+    isSucceeded: (state) => state.status === "succeeded",
+});
+/**
+ * Returns a poller factory.
+ */
+function buildCreatePoller(inputs) {
+    const { getOperationLocation, getStatusFromInitialResponse, getStatusFromPollResponse, isOperationError, getResourceLocation, getPollingInterval, getError, resolveOnUnsuccessful, } = inputs;
+    return async ({ init, poll }, options) => {
+        const { processResult, updateState, withOperationLocation: withOperationLocationCallback, intervalInMs = constants_js_1.POLL_INTERVAL_IN_MS, restoreFrom, } = options || {};
+        const stateProxy = createStateProxy();
+        const withOperationLocation = withOperationLocationCallback
+            ? (() => {
+                let called = false;
+                return (operationLocation, isUpdated) => {
+                    if (isUpdated)
+                        withOperationLocationCallback(operationLocation);
+                    else if (!called)
+                        withOperationLocationCallback(operationLocation);
+                    called = true;
+                };
+            })()
+            : undefined;
+        const state = restoreFrom
+            ? (0, operation_js_1.deserializeState)(restoreFrom)
+            : await (0, operation_js_1.initOperation)({
+                init,
+                stateProxy,
+                processResult,
+                getOperationStatus: getStatusFromInitialResponse,
+                withOperationLocation,
+                setErrorAsResult: !resolveOnUnsuccessful,
+            });
+        let resultPromise;
+        const abortController = new AbortController();
+        const handlers = new Map();
+        const handleProgressEvents = async () => handlers.forEach((h) => h(state));
+        const cancelErrMsg = "Operation was canceled";
+        let currentPollIntervalInMs = intervalInMs;
+        const poller = {
+            getOperationState: () => state,
+            getResult: () => state.result,
+            isDone: () => ["succeeded", "failed", "canceled"].includes(state.status),
+            isStopped: () => resultPromise === undefined,
+            stopPolling: () => {
+                abortController.abort();
+            },
+            toString: () => JSON.stringify({
+                state,
+            }),
+            onProgress: (callback) => {
+                const s = Symbol();
+                handlers.set(s, callback);
+                return () => handlers.delete(s);
+            },
+            pollUntilDone: (pollOptions) => (resultPromise !== null && resultPromise !== void 0 ? resultPromise : (resultPromise = (async () => {
+                const { abortSignal: inputAbortSignal } = pollOptions || {};
+                // In the future we can use AbortSignal.any() instead
+                function abortListener() {
+                    abortController.abort();
+                }
+                const abortSignal = abortController.signal;
+                if (inputAbortSignal === null || inputAbortSignal === void 0 ? void 0 : inputAbortSignal.aborted) {
+                    abortController.abort();
+                }
+                else if (!abortSignal.aborted) {
+                    inputAbortSignal === null || inputAbortSignal === void 0 ? void 0 : inputAbortSignal.addEventListener("abort", abortListener, { once: true });
+                }
+                try {
+                    if (!poller.isDone()) {
+                        await poller.poll({ abortSignal });
+                        while (!poller.isDone()) {
+                            await (0, core_util_1.delay)(currentPollIntervalInMs, { abortSignal });
+                            await poller.poll({ abortSignal });
+                        }
+                    }
+                }
+                finally {
+                    inputAbortSignal === null || inputAbortSignal === void 0 ? void 0 : inputAbortSignal.removeEventListener("abort", abortListener);
+                }
+                if (resolveOnUnsuccessful) {
+                    return poller.getResult();
+                }
+                else {
+                    switch (state.status) {
+                        case "succeeded":
+                            return poller.getResult();
+                        case "canceled":
+                            throw new Error(cancelErrMsg);
+                        case "failed":
+                            throw state.error;
+                        case "notStarted":
+                        case "running":
+                            throw new Error(`Polling completed without succeeding or failing`);
+                    }
+                }
+            })().finally(() => {
+                resultPromise = undefined;
+            }))),
+            async poll(pollOptions) {
+                if (resolveOnUnsuccessful) {
+                    if (poller.isDone())
+                        return;
+                }
+                else {
+                    switch (state.status) {
+                        case "succeeded":
+                            return;
+                        case "canceled":
+                            throw new Error(cancelErrMsg);
+                        case "failed":
+                            throw state.error;
+                    }
+                }
+                await (0, operation_js_1.pollOperation)({
+                    poll,
+                    state,
+                    stateProxy,
+                    getOperationLocation,
+                    isOperationError,
+                    withOperationLocation,
+                    getPollingInterval,
+                    getOperationStatus: getStatusFromPollResponse,
+                    getResourceLocation,
+                    processResult,
+                    getError,
+                    updateState,
+                    options: pollOptions,
+                    setDelay: (pollIntervalInMs) => {
+                        currentPollIntervalInMs = pollIntervalInMs;
+                    },
+                    setErrorAsResult: !resolveOnUnsuccessful,
+                });
+                await handleProgressEvents();
+                if (!resolveOnUnsuccessful) {
+                    switch (state.status) {
+                        case "canceled":
+                            throw new Error(cancelErrMsg);
+                        case "failed":
+                            throw state.error;
+                    }
+                }
+            },
+        };
+        return poller;
+    };
+}
+exports.buildCreatePoller = buildCreatePoller;
+//# sourceMappingURL=poller.js.map
+
+/***/ }),
+
+/***/ 7345:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getPagedAsyncIterator = void 0;
+const tslib_1 = __nccwpck_require__(36);
+/**
+ * returns an async iterator that iterates over results. It also has a `byPage`
+ * method that returns pages of items at once.
+ *
+ * @param pagedResult - an object that specifies how to get pages.
+ * @returns a paged async iterator that iterates over results.
+ */
+function getPagedAsyncIterator(pagedResult) {
+    var _a;
+    const iter = getItemAsyncIterator(pagedResult);
+    return {
+        next() {
+            return iter.next();
+        },
+        [Symbol.asyncIterator]() {
+            return this;
+        },
+        byPage: (_a = pagedResult === null || pagedResult === void 0 ? void 0 : pagedResult.byPage) !== null && _a !== void 0 ? _a : ((settings) => {
+            const { continuationToken, maxPageSize } = settings !== null && settings !== void 0 ? settings : {};
+            return getPageAsyncIterator(pagedResult, {
+                pageLink: continuationToken,
+                maxPageSize,
+            });
+        }),
+    };
+}
+exports.getPagedAsyncIterator = getPagedAsyncIterator;
+function getItemAsyncIterator(pagedResult) {
+    return tslib_1.__asyncGenerator(this, arguments, function* getItemAsyncIterator_1() {
+        var _a, e_1, _b, _c, _d, e_2, _e, _f;
+        const pages = getPageAsyncIterator(pagedResult);
+        const firstVal = yield tslib_1.__await(pages.next());
+        // if the result does not have an array shape, i.e. TPage = TElement, then we return it as is
+        if (!Array.isArray(firstVal.value)) {
+            // can extract elements from this page
+            const { toElements } = pagedResult;
+            if (toElements) {
+                yield tslib_1.__await(yield* tslib_1.__asyncDelegator(tslib_1.__asyncValues(toElements(firstVal.value))));
+                try {
+                    for (var _g = true, pages_1 = tslib_1.__asyncValues(pages), pages_1_1; pages_1_1 = yield tslib_1.__await(pages_1.next()), _a = pages_1_1.done, !_a; _g = true) {
+                        _c = pages_1_1.value;
+                        _g = false;
+                        const page = _c;
+                        yield tslib_1.__await(yield* tslib_1.__asyncDelegator(tslib_1.__asyncValues(toElements(page))));
+                    }
+                }
+                catch (e_1_1) { e_1 = { error: e_1_1 }; }
+                finally {
+                    try {
+                        if (!_g && !_a && (_b = pages_1.return)) yield tslib_1.__await(_b.call(pages_1));
+                    }
+                    finally { if (e_1) throw e_1.error; }
+                }
+            }
+            else {
+                yield yield tslib_1.__await(firstVal.value);
+                // `pages` is of type `AsyncIterableIterator<TPage>` but TPage = TElement in this case
+                yield tslib_1.__await(yield* tslib_1.__asyncDelegator(tslib_1.__asyncValues(pages)));
+            }
+        }
+        else {
+            yield tslib_1.__await(yield* tslib_1.__asyncDelegator(tslib_1.__asyncValues(firstVal.value)));
+            try {
+                for (var _h = true, pages_2 = tslib_1.__asyncValues(pages), pages_2_1; pages_2_1 = yield tslib_1.__await(pages_2.next()), _d = pages_2_1.done, !_d; _h = true) {
+                    _f = pages_2_1.value;
+                    _h = false;
+                    const page = _f;
+                    // pages is of type `AsyncIterableIterator<TPage>` so `page` is of type `TPage`. In this branch,
+                    // it must be the case that `TPage = TElement[]`
+                    yield tslib_1.__await(yield* tslib_1.__asyncDelegator(tslib_1.__asyncValues(page)));
+                }
+            }
+            catch (e_2_1) { e_2 = { error: e_2_1 }; }
+            finally {
+                try {
+                    if (!_h && !_d && (_e = pages_2.return)) yield tslib_1.__await(_e.call(pages_2));
+                }
+                finally { if (e_2) throw e_2.error; }
+            }
+        }
+    });
+}
+function getPageAsyncIterator(pagedResult, options = {}) {
+    return tslib_1.__asyncGenerator(this, arguments, function* getPageAsyncIterator_1() {
+        const { pageLink, maxPageSize } = options;
+        let response = yield tslib_1.__await(pagedResult.getPage(pageLink !== null && pageLink !== void 0 ? pageLink : pagedResult.firstPageLink, maxPageSize));
+        if (!response) {
+            return yield tslib_1.__await(void 0);
+        }
+        yield yield tslib_1.__await(response.page);
+        while (response.nextPageLink) {
+            response = yield tslib_1.__await(pagedResult.getPage(response.nextPageLink, maxPageSize));
+            if (!response) {
+                return yield tslib_1.__await(void 0);
+            }
+            yield yield tslib_1.__await(response.page);
+        }
+    });
+}
+//# sourceMappingURL=getPagedAsyncIterator.js.map
+
+/***/ }),
+
+/***/ 7121:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const tslib_1 = __nccwpck_require__(36);
+tslib_1.__exportStar(__nccwpck_require__(181), exports);
+tslib_1.__exportStar(__nccwpck_require__(7345), exports);
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 181:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=models.js.map
+
+/***/ }),
+
+/***/ 5190:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.cancelablePromiseRace = void 0;
+/**
+ * promise.race() wrapper that aborts rest of promises as soon as the first promise settles.
+ */
+async function cancelablePromiseRace(abortablePromiseBuilders, options) {
+    var _a, _b;
+    const aborter = new AbortController();
+    function abortHandler() {
+        aborter.abort();
+    }
+    (_a = options === null || options === void 0 ? void 0 : options.abortSignal) === null || _a === void 0 ? void 0 : _a.addEventListener("abort", abortHandler);
+    try {
+        return await Promise.race(abortablePromiseBuilders.map((p) => p({ abortSignal: aborter.signal })));
+    }
+    finally {
+        aborter.abort();
+        (_b = options === null || options === void 0 ? void 0 : options.abortSignal) === null || _b === void 0 ? void 0 : _b.removeEventListener("abort", abortHandler);
+    }
+}
+exports.cancelablePromiseRace = cancelablePromiseRace;
+//# sourceMappingURL=aborterUtils.js.map
+
+/***/ }),
+
+/***/ 9234:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.stringToUint8Array = exports.uint8ArrayToString = void 0;
+/**
+ * The helper that transforms bytes with specific character encoding into string
+ * @param bytes - the uint8array bytes
+ * @param format - the format we use to encode the byte
+ * @returns a string of the encoded string
+ */
+function uint8ArrayToString(bytes, format) {
+    return Buffer.from(bytes).toString(format);
+}
+exports.uint8ArrayToString = uint8ArrayToString;
+/**
+ * The helper that transforms string to specific character encoded bytes array.
+ * @param value - the string to be converted
+ * @param format - the format we use to decode the value
+ * @returns a uint8array
+ */
+function stringToUint8Array(value, format) {
+    return Buffer.from(value, format);
+}
+exports.stringToUint8Array = stringToUint8Array;
+//# sourceMappingURL=bytesEncoding.js.map
+
+/***/ }),
+
+/***/ 5608:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+var _a, _b, _c, _d;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isReactNative = exports.isNodeRuntime = exports.isNode = exports.isNodeLike = exports.isBun = exports.isDeno = exports.isWebWorker = exports.isBrowser = void 0;
+/**
+ * A constant that indicates whether the environment the code is running is a Web Browser.
+ */
+// eslint-disable-next-line @azure/azure-sdk/ts-no-window
+exports.isBrowser = typeof window !== "undefined" && typeof window.document !== "undefined";
+/**
+ * A constant that indicates whether the environment the code is running is a Web Worker.
+ */
+exports.isWebWorker = typeof self === "object" &&
+    typeof (self === null || self === void 0 ? void 0 : self.importScripts) === "function" &&
+    (((_a = self.constructor) === null || _a === void 0 ? void 0 : _a.name) === "DedicatedWorkerGlobalScope" ||
+        ((_b = self.constructor) === null || _b === void 0 ? void 0 : _b.name) === "ServiceWorkerGlobalScope" ||
+        ((_c = self.constructor) === null || _c === void 0 ? void 0 : _c.name) === "SharedWorkerGlobalScope");
+/**
+ * A constant that indicates whether the environment the code is running is Deno.
+ */
+exports.isDeno = typeof Deno !== "undefined" &&
+    typeof Deno.version !== "undefined" &&
+    typeof Deno.version.deno !== "undefined";
+/**
+ * A constant that indicates whether the environment the code is running is Bun.sh.
+ */
+exports.isBun = typeof Bun !== "undefined" && typeof Bun.version !== "undefined";
+/**
+ * A constant that indicates whether the environment the code is running is a Node.js compatible environment.
+ */
+exports.isNodeLike = typeof globalThis.process !== "undefined" &&
+    Boolean(globalThis.process.version) &&
+    Boolean((_d = globalThis.process.versions) === null || _d === void 0 ? void 0 : _d.node);
+/**
+ * A constant that indicates whether the environment the code is running is a Node.js compatible environment.
+ * @deprecated Use `isNodeLike` instead.
+ */
+exports.isNode = exports.isNodeLike;
+/**
+ * A constant that indicates whether the environment the code is running is Node.JS.
+ */
+exports.isNodeRuntime = exports.isNodeLike && !exports.isBun && !exports.isDeno;
+/**
+ * A constant that indicates whether the environment the code is running is in React-Native.
+ */
+// https://github.com/facebook/react-native/blob/main/packages/react-native/Libraries/Core/setUpNavigator.js
+exports.isReactNative = typeof navigator !== "undefined" && (navigator === null || navigator === void 0 ? void 0 : navigator.product) === "ReactNative";
+//# sourceMappingURL=checkEnvironment.js.map
+
+/***/ }),
+
+/***/ 6764:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createAbortablePromise = void 0;
+const abort_controller_1 = __nccwpck_require__(825);
+/**
+ * Creates an abortable promise.
+ * @param buildPromise - A function that takes the resolve and reject functions as parameters.
+ * @param options - The options for the abortable promise.
+ * @returns A promise that can be aborted.
+ */
+function createAbortablePromise(buildPromise, options) {
+    const { cleanupBeforeAbort, abortSignal, abortErrorMsg } = options !== null && options !== void 0 ? options : {};
+    return new Promise((resolve, reject) => {
+        function rejectOnAbort() {
+            reject(new abort_controller_1.AbortError(abortErrorMsg !== null && abortErrorMsg !== void 0 ? abortErrorMsg : "The operation was aborted."));
+        }
+        function removeListeners() {
+            abortSignal === null || abortSignal === void 0 ? void 0 : abortSignal.removeEventListener("abort", onAbort);
+        }
+        function onAbort() {
+            cleanupBeforeAbort === null || cleanupBeforeAbort === void 0 ? void 0 : cleanupBeforeAbort();
+            removeListeners();
+            rejectOnAbort();
+        }
+        if (abortSignal === null || abortSignal === void 0 ? void 0 : abortSignal.aborted) {
+            return rejectOnAbort();
+        }
+        try {
+            buildPromise((x) => {
+                removeListeners();
+                resolve(x);
+            }, (x) => {
+                removeListeners();
+                reject(x);
+            });
+        }
+        catch (err) {
+            reject(err);
+        }
+        abortSignal === null || abortSignal === void 0 ? void 0 : abortSignal.addEventListener("abort", onAbort);
+    });
+}
+exports.createAbortablePromise = createAbortablePromise;
+//# sourceMappingURL=createAbortablePromise.js.map
+
+/***/ }),
+
+/***/ 7789:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.delay = void 0;
+const createAbortablePromise_js_1 = __nccwpck_require__(6764);
+const StandardAbortMessage = "The delay was aborted.";
+/**
+ * A wrapper for setTimeout that resolves a promise after timeInMs milliseconds.
+ * @param timeInMs - The number of milliseconds to be delayed.
+ * @param options - The options for delay - currently abort options
+ * @returns Promise that is resolved after timeInMs
+ */
+function delay(timeInMs, options) {
+    let token;
+    const { abortSignal, abortErrorMsg } = options !== null && options !== void 0 ? options : {};
+    return (0, createAbortablePromise_js_1.createAbortablePromise)((resolve) => {
+        token = setTimeout(resolve, timeInMs);
+    }, {
+        cleanupBeforeAbort: () => clearTimeout(token),
+        abortSignal,
+        abortErrorMsg: abortErrorMsg !== null && abortErrorMsg !== void 0 ? abortErrorMsg : StandardAbortMessage,
+    });
+}
+exports.delay = delay;
+//# sourceMappingURL=delay.js.map
+
+/***/ }),
+
+/***/ 1873:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getErrorMessage = exports.isError = void 0;
+const object_js_1 = __nccwpck_require__(9669);
+/**
+ * Typeguard for an error object shape (has name and message)
+ * @param e - Something caught by a catch clause.
+ */
+function isError(e) {
+    if ((0, object_js_1.isObject)(e)) {
+        const hasName = typeof e.name === "string";
+        const hasMessage = typeof e.message === "string";
+        return hasName && hasMessage;
+    }
+    return false;
+}
+exports.isError = isError;
+/**
+ * Given what is thought to be an error object, return the message if possible.
+ * If the message is missing, returns a stringified version of the input.
+ * @param e - Something thrown from a try block
+ * @returns The error message or a string of the input
+ */
+function getErrorMessage(e) {
+    if (isError(e)) {
+        return e.message;
+    }
+    else {
+        let stringified;
+        try {
+            if (typeof e === "object" && e) {
+                stringified = JSON.stringify(e);
+            }
+            else {
+                stringified = String(e);
+            }
+        }
+        catch (err) {
+            stringified = "[unable to stringify input]";
+        }
+        return `Unknown error ${stringified}`;
+    }
+}
+exports.getErrorMessage = getErrorMessage;
+//# sourceMappingURL=error.js.map
+
+/***/ }),
+
+/***/ 7409:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.stringToUint8Array = exports.uint8ArrayToString = exports.isWebWorker = exports.isReactNative = exports.isDeno = exports.isNodeRuntime = exports.isNodeLike = exports.isNode = exports.isBun = exports.isBrowser = exports.randomUUID = exports.objectHasProperty = exports.isObjectWithProperties = exports.isDefined = exports.computeSha256Hmac = exports.computeSha256Hash = exports.getErrorMessage = exports.isError = exports.isObject = exports.getRandomIntegerInclusive = exports.createAbortablePromise = exports.cancelablePromiseRace = exports.delay = void 0;
+var delay_js_1 = __nccwpck_require__(7789);
+Object.defineProperty(exports, "delay", ({ enumerable: true, get: function () { return delay_js_1.delay; } }));
+var aborterUtils_js_1 = __nccwpck_require__(5190);
+Object.defineProperty(exports, "cancelablePromiseRace", ({ enumerable: true, get: function () { return aborterUtils_js_1.cancelablePromiseRace; } }));
+var createAbortablePromise_js_1 = __nccwpck_require__(6764);
+Object.defineProperty(exports, "createAbortablePromise", ({ enumerable: true, get: function () { return createAbortablePromise_js_1.createAbortablePromise; } }));
+var random_js_1 = __nccwpck_require__(3835);
+Object.defineProperty(exports, "getRandomIntegerInclusive", ({ enumerable: true, get: function () { return random_js_1.getRandomIntegerInclusive; } }));
+var object_js_1 = __nccwpck_require__(9669);
+Object.defineProperty(exports, "isObject", ({ enumerable: true, get: function () { return object_js_1.isObject; } }));
+var error_js_1 = __nccwpck_require__(1873);
+Object.defineProperty(exports, "isError", ({ enumerable: true, get: function () { return error_js_1.isError; } }));
+Object.defineProperty(exports, "getErrorMessage", ({ enumerable: true, get: function () { return error_js_1.getErrorMessage; } }));
+var sha256_js_1 = __nccwpck_require__(136);
+Object.defineProperty(exports, "computeSha256Hash", ({ enumerable: true, get: function () { return sha256_js_1.computeSha256Hash; } }));
+Object.defineProperty(exports, "computeSha256Hmac", ({ enumerable: true, get: function () { return sha256_js_1.computeSha256Hmac; } }));
+var typeGuards_js_1 = __nccwpck_require__(225);
+Object.defineProperty(exports, "isDefined", ({ enumerable: true, get: function () { return typeGuards_js_1.isDefined; } }));
+Object.defineProperty(exports, "isObjectWithProperties", ({ enumerable: true, get: function () { return typeGuards_js_1.isObjectWithProperties; } }));
+Object.defineProperty(exports, "objectHasProperty", ({ enumerable: true, get: function () { return typeGuards_js_1.objectHasProperty; } }));
+var uuidUtils_js_1 = __nccwpck_require__(3563);
+Object.defineProperty(exports, "randomUUID", ({ enumerable: true, get: function () { return uuidUtils_js_1.randomUUID; } }));
+var checkEnvironment_js_1 = __nccwpck_require__(5608);
+Object.defineProperty(exports, "isBrowser", ({ enumerable: true, get: function () { return checkEnvironment_js_1.isBrowser; } }));
+Object.defineProperty(exports, "isBun", ({ enumerable: true, get: function () { return checkEnvironment_js_1.isBun; } }));
+Object.defineProperty(exports, "isNode", ({ enumerable: true, get: function () { return checkEnvironment_js_1.isNode; } }));
+Object.defineProperty(exports, "isNodeLike", ({ enumerable: true, get: function () { return checkEnvironment_js_1.isNodeLike; } }));
+Object.defineProperty(exports, "isNodeRuntime", ({ enumerable: true, get: function () { return checkEnvironment_js_1.isNodeRuntime; } }));
+Object.defineProperty(exports, "isDeno", ({ enumerable: true, get: function () { return checkEnvironment_js_1.isDeno; } }));
+Object.defineProperty(exports, "isReactNative", ({ enumerable: true, get: function () { return checkEnvironment_js_1.isReactNative; } }));
+Object.defineProperty(exports, "isWebWorker", ({ enumerable: true, get: function () { return checkEnvironment_js_1.isWebWorker; } }));
+var bytesEncoding_js_1 = __nccwpck_require__(9234);
+Object.defineProperty(exports, "uint8ArrayToString", ({ enumerable: true, get: function () { return bytesEncoding_js_1.uint8ArrayToString; } }));
+Object.defineProperty(exports, "stringToUint8Array", ({ enumerable: true, get: function () { return bytesEncoding_js_1.stringToUint8Array; } }));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 9669:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isObject = void 0;
+/**
+ * Helper to determine when an input is a generic JS object.
+ * @returns true when input is an object type that is not null, Array, RegExp, or Date.
+ */
+function isObject(input) {
+    return (typeof input === "object" &&
+        input !== null &&
+        !Array.isArray(input) &&
+        !(input instanceof RegExp) &&
+        !(input instanceof Date));
+}
+exports.isObject = isObject;
+//# sourceMappingURL=object.js.map
+
+/***/ }),
+
+/***/ 3835:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getRandomIntegerInclusive = void 0;
+/**
+ * Returns a random integer value between a lower and upper bound,
+ * inclusive of both bounds.
+ * Note that this uses Math.random and isn't secure. If you need to use
+ * this for any kind of security purpose, find a better source of random.
+ * @param min - The smallest integer value allowed.
+ * @param max - The largest integer value allowed.
+ */
+function getRandomIntegerInclusive(min, max) {
+    // Make sure inputs are integers.
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    // Pick a random offset from zero to the size of the range.
+    // Since Math.random() can never return 1, we have to make the range one larger
+    // in order to be inclusive of the maximum value after we take the floor.
+    const offset = Math.floor(Math.random() * (max - min + 1));
+    return offset + min;
+}
+exports.getRandomIntegerInclusive = getRandomIntegerInclusive;
+//# sourceMappingURL=random.js.map
+
+/***/ }),
+
+/***/ 136:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.computeSha256Hash = exports.computeSha256Hmac = void 0;
+const crypto_1 = __nccwpck_require__(6113);
+/**
+ * Generates a SHA-256 HMAC signature.
+ * @param key - The HMAC key represented as a base64 string, used to generate the cryptographic HMAC hash.
+ * @param stringToSign - The data to be signed.
+ * @param encoding - The textual encoding to use for the returned HMAC digest.
+ */
+async function computeSha256Hmac(key, stringToSign, encoding) {
+    const decodedKey = Buffer.from(key, "base64");
+    return (0, crypto_1.createHmac)("sha256", decodedKey).update(stringToSign).digest(encoding);
+}
+exports.computeSha256Hmac = computeSha256Hmac;
+/**
+ * Generates a SHA-256 hash.
+ * @param content - The data to be included in the hash.
+ * @param encoding - The textual encoding to use for the returned hash.
+ */
+async function computeSha256Hash(content, encoding) {
+    return (0, crypto_1.createHash)("sha256").update(content).digest(encoding);
+}
+exports.computeSha256Hash = computeSha256Hash;
+//# sourceMappingURL=sha256.js.map
+
+/***/ }),
+
+/***/ 225:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.objectHasProperty = exports.isObjectWithProperties = exports.isDefined = void 0;
+/**
+ * Helper TypeGuard that checks if something is defined or not.
+ * @param thing - Anything
+ */
+function isDefined(thing) {
+    return typeof thing !== "undefined" && thing !== null;
+}
+exports.isDefined = isDefined;
+/**
+ * Helper TypeGuard that checks if the input is an object with the specified properties.
+ * @param thing - Anything.
+ * @param properties - The name of the properties that should appear in the object.
+ */
+function isObjectWithProperties(thing, properties) {
+    if (!isDefined(thing) || typeof thing !== "object") {
+        return false;
+    }
+    for (const property of properties) {
+        if (!objectHasProperty(thing, property)) {
+            return false;
+        }
+    }
+    return true;
+}
+exports.isObjectWithProperties = isObjectWithProperties;
+/**
+ * Helper TypeGuard that checks if the input is an object with the specified property.
+ * @param thing - Any object.
+ * @param property - The name of the property that should appear in the object.
+ */
+function objectHasProperty(thing, property) {
+    return (isDefined(thing) && typeof thing === "object" && property in thing);
+}
+exports.objectHasProperty = objectHasProperty;
+//# sourceMappingURL=typeGuards.js.map
+
+/***/ }),
+
+/***/ 3563:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+var _a;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.randomUUID = void 0;
+const crypto_1 = __nccwpck_require__(6113);
+// NOTE: This is a workaround until we can use `globalThis.crypto.randomUUID` in Node.js 19+.
+const uuidFunction = typeof ((_a = globalThis === null || globalThis === void 0 ? void 0 : globalThis.crypto) === null || _a === void 0 ? void 0 : _a.randomUUID) === "function"
+    ? globalThis.crypto.randomUUID.bind(globalThis.crypto)
+    : crypto_1.randomUUID;
+/**
+ * Generated Universally Unique Identifier
+ *
+ * @returns RFC4122 v4 UUID.
+ */
+function randomUUID() {
+    return uuidFunction();
+}
+exports.randomUUID = randomUUID;
+//# sourceMappingURL=uuidUtils.js.map
+
+/***/ }),
+
+/***/ 4102:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.AbortError = void 0;
+/**
+ * This error is thrown when an asynchronous operation has been aborted.
+ * Check for this error by testing the `name` that the name property of the
+ * error matches `"AbortError"`.
+ *
+ * @example
+ * ```ts
+ * const controller = new AbortController();
+ * controller.abort();
+ * try {
+ *   doAsyncWork(controller.signal)
+ * } catch (e) {
+ *   if (e.name === 'AbortError') {
+ *     // handle abort error here.
+ *   }
+ * }
+ * ```
+ */
+class AbortError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "AbortError";
+    }
+}
+exports.AbortError = AbortError;
+//# sourceMappingURL=AbortError.js.map
+
+/***/ }),
+
+/***/ 825:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.AbortError = void 0;
+var AbortError_js_1 = __nccwpck_require__(4102);
+Object.defineProperty(exports, "AbortError", ({ enumerable: true, get: function () { return AbortError_js_1.AbortError; } }));
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 3988:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const log_js_1 = __nccwpck_require__(1485);
+const debugEnvVariable = (typeof process !== "undefined" && process.env && process.env.DEBUG) || undefined;
+let enabledString;
+let enabledNamespaces = [];
+let skippedNamespaces = [];
+const debuggers = [];
+if (debugEnvVariable) {
+    enable(debugEnvVariable);
+}
+const debugObj = Object.assign((namespace) => {
+    return createDebugger(namespace);
+}, {
+    enable,
+    enabled,
+    disable,
+    log: log_js_1.log,
+});
+function enable(namespaces) {
+    enabledString = namespaces;
+    enabledNamespaces = [];
+    skippedNamespaces = [];
+    const wildcard = /\*/g;
+    const namespaceList = namespaces.split(",").map((ns) => ns.trim().replace(wildcard, ".*?"));
+    for (const ns of namespaceList) {
+        if (ns.startsWith("-")) {
+            skippedNamespaces.push(new RegExp(`^${ns.substr(1)}$`));
+        }
+        else {
+            enabledNamespaces.push(new RegExp(`^${ns}$`));
+        }
+    }
+    for (const instance of debuggers) {
+        instance.enabled = enabled(instance.namespace);
+    }
+}
+function enabled(namespace) {
+    if (namespace.endsWith("*")) {
+        return true;
+    }
+    for (const skipped of skippedNamespaces) {
+        if (skipped.test(namespace)) {
+            return false;
+        }
+    }
+    for (const enabledNamespace of enabledNamespaces) {
+        if (enabledNamespace.test(namespace)) {
+            return true;
+        }
+    }
+    return false;
+}
+function disable() {
+    const result = enabledString || "";
+    enable("");
+    return result;
+}
+function createDebugger(namespace) {
+    const newDebugger = Object.assign(debug, {
+        enabled: enabled(namespace),
+        destroy,
+        log: debugObj.log,
+        namespace,
+        extend,
+    });
+    function debug(...args) {
+        if (!newDebugger.enabled) {
+            return;
+        }
+        if (args.length > 0) {
+            args[0] = `${namespace} ${args[0]}`;
+        }
+        newDebugger.log(...args);
+    }
+    debuggers.push(newDebugger);
+    return newDebugger;
+}
+function destroy() {
+    const index = debuggers.indexOf(this);
+    if (index >= 0) {
+        debuggers.splice(index, 1);
+        return true;
+    }
+    return false;
+}
+function extend(namespace) {
+    const newDebugger = createDebugger(`${this.namespace}:${namespace}`);
+    newDebugger.log = this.log;
+    return newDebugger;
+}
+exports["default"] = debugObj;
+//# sourceMappingURL=debug.js.map
+
+/***/ }),
+
+/***/ 865:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createClientLogger = exports.getLogLevel = exports.setLogLevel = exports.AzureLogger = void 0;
+const tslib_1 = __nccwpck_require__(36);
+const debug_js_1 = tslib_1.__importDefault(__nccwpck_require__(3988));
+const registeredLoggers = new Set();
+const logLevelFromEnv = (typeof process !== "undefined" && process.env && process.env.AZURE_LOG_LEVEL) || undefined;
+let azureLogLevel;
+/**
+ * The AzureLogger provides a mechanism for overriding where logs are output to.
+ * By default, logs are sent to stderr.
+ * Override the `log` method to redirect logs to another location.
+ */
+exports.AzureLogger = (0, debug_js_1.default)("azure");
+exports.AzureLogger.log = (...args) => {
+    debug_js_1.default.log(...args);
+};
+const AZURE_LOG_LEVELS = ["verbose", "info", "warning", "error"];
+if (logLevelFromEnv) {
+    // avoid calling setLogLevel because we don't want a mis-set environment variable to crash
+    if (isAzureLogLevel(logLevelFromEnv)) {
+        setLogLevel(logLevelFromEnv);
+    }
+    else {
+        console.error(`AZURE_LOG_LEVEL set to unknown log level '${logLevelFromEnv}'; logging is not enabled. Acceptable values: ${AZURE_LOG_LEVELS.join(", ")}.`);
+    }
+}
+/**
+ * Immediately enables logging at the specified log level. If no level is specified, logging is disabled.
+ * @param level - The log level to enable for logging.
+ * Options from most verbose to least verbose are:
+ * - verbose
+ * - info
+ * - warning
+ * - error
+ */
+function setLogLevel(level) {
+    if (level && !isAzureLogLevel(level)) {
+        throw new Error(`Unknown log level '${level}'. Acceptable values: ${AZURE_LOG_LEVELS.join(",")}`);
+    }
+    azureLogLevel = level;
+    const enabledNamespaces = [];
+    for (const logger of registeredLoggers) {
+        if (shouldEnable(logger)) {
+            enabledNamespaces.push(logger.namespace);
+        }
+    }
+    debug_js_1.default.enable(enabledNamespaces.join(","));
+}
+exports.setLogLevel = setLogLevel;
+/**
+ * Retrieves the currently specified log level.
+ */
+function getLogLevel() {
+    return azureLogLevel;
+}
+exports.getLogLevel = getLogLevel;
+const levelMap = {
+    verbose: 400,
+    info: 300,
+    warning: 200,
+    error: 100,
+};
+/**
+ * Creates a logger for use by the Azure SDKs that inherits from `AzureLogger`.
+ * @param namespace - The name of the SDK package.
+ * @hidden
+ */
+function createClientLogger(namespace) {
+    const clientRootLogger = exports.AzureLogger.extend(namespace);
+    patchLogMethod(exports.AzureLogger, clientRootLogger);
+    return {
+        error: createLogger(clientRootLogger, "error"),
+        warning: createLogger(clientRootLogger, "warning"),
+        info: createLogger(clientRootLogger, "info"),
+        verbose: createLogger(clientRootLogger, "verbose"),
+    };
+}
+exports.createClientLogger = createClientLogger;
+function patchLogMethod(parent, child) {
+    child.log = (...args) => {
+        parent.log(...args);
+    };
+}
+function createLogger(parent, level) {
+    const logger = Object.assign(parent.extend(level), {
+        level,
+    });
+    patchLogMethod(parent, logger);
+    if (shouldEnable(logger)) {
+        const enabledNamespaces = debug_js_1.default.disable();
+        debug_js_1.default.enable(enabledNamespaces + "," + logger.namespace);
+    }
+    registeredLoggers.add(logger);
+    return logger;
+}
+function shouldEnable(logger) {
+    return Boolean(azureLogLevel && levelMap[logger.level] <= levelMap[azureLogLevel]);
+}
+function isAzureLogLevel(logLevel) {
+    return AZURE_LOG_LEVELS.includes(logLevel);
+}
+//# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 1485:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.log = void 0;
+const tslib_1 = __nccwpck_require__(36);
+const node_os_1 = __nccwpck_require__(612);
+const node_util_1 = tslib_1.__importDefault(__nccwpck_require__(7261));
+const process = tslib_1.__importStar(__nccwpck_require__(7742));
+function log(message, ...args) {
+    process.stderr.write(`${node_util_1.default.format(message, ...args)}${node_os_1.EOL}`);
+}
+exports.log = log;
+//# sourceMappingURL=log.js.map
 
 /***/ }),
 
