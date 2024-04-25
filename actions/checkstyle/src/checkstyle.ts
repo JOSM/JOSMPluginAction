@@ -69,7 +69,7 @@ export function parseData(trim: number, data: string | Buffer): Problem[] {
   return problems;
 }
 
-export function run(pathTrim: string, checkstyleFile: string) {
+export function run(checkstyleFile: string, pathTrim: string = "") {
   let trim: number;
   if (pathTrim === "") {
     trim = process.cwd().split(sep).length;

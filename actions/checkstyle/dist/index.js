@@ -29060,7 +29060,7 @@ function checkstyle_parseData(trim, data) {
     }
     return problems;
 }
-function checkstyle_run(pathTrim, checkstyleFile) {
+function checkstyle_run(checkstyleFile, pathTrim = "") {
     let trim;
     if (pathTrim === "") {
         trim = process.cwd().split(external_path_.sep).length;

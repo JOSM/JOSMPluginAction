@@ -32,7 +32,7 @@ describe("Test action/parseData", () => {
   });
   test("JOSM Checkstyle XML, single file", () => {
     expect(() =>
-      actionRun("", "/Users/tsmock/workspace/josm/core/checkstyle-josm.xml"),
+      actionRun("/Users/tsmock/workspace/josm/core/checkstyle-josm.xml", ""),
     ).not.toThrow();
   });
 });
