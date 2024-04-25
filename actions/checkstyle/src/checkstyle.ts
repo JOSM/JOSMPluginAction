@@ -1,8 +1,8 @@
 import { debug } from "@actions/core";
 import { readFileSync, existsSync } from "fs";
 import { XMLParser } from "fast-xml-parser";
-import { Problem } from "pmd";
-import { logProblems } from "pmd";
+import { Problem } from "pmd/src/pmd";
+import { logProblems } from "pmd/src/pmd";
 import { sep, join } from "path";
 
 interface Violations {

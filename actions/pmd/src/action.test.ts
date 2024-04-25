@@ -1,4 +1,4 @@
-import { parseData } from "./action";
+import { parseData } from "./pmd";
 import { describe, expect, test } from "@jest/globals";
 import { expectProblem } from "./problem.test";
 

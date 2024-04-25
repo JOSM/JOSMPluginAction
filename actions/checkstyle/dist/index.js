@@ -1,4 +1,4 @@
-/******/ (() => { // webpackBootstrap
+require('./sourcemap-register.js');/******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
 /***/ 9548:
@@ -28940,7 +28940,7 @@ var external_fs_ = __nccwpck_require__(7147);
 var fxp = __nccwpck_require__(626);
 ;// CONCATENATED MODULE: ../pmd/src/logProblems.ts
 
-function logProblems(problems) {
+function logProblems_logProblems(problems) {
     for (const problem of problems) {
         (0,core.error)(problem.info !== undefined && problem.info !== null ? problem.info : "", problem);
     }
@@ -28952,7 +28952,7 @@ function logProblems(problems) {
     }
 }
 
-;// CONCATENATED MODULE: ../pmd/src/action.ts
+;// CONCATENATED MODULE: ../pmd/src/pmd.ts
 
 
 
@@ -28980,7 +28980,7 @@ function parseFile(sourceDirectory, fileData) {
 }
 function parseData(sourceDirectory, data) {
     const alwaysArray = ["pmd.file", "pmd.file.violation"];
-    const parser = new fxp.XMLParser({
+    const parser = new XMLParser({
         ignoreAttributes: false,
         isArray: (name, jpath) => {
             return alwaysArray.indexOf(jpath) >= 0;
@@ -28996,14 +28996,11 @@ function parseData(sourceDirectory, data) {
     }
     return problems;
 }
-async function run() {
-    const pmdFile = (0,core.getInput)("file");
-    const sourceDir = (0,core.getInput)("src");
-    const data = (0,external_fs_.readFileSync)(pmdFile);
-    (0,core.debug)(data.toString());
+function run(sourceDir, pmdFile) {
+    const data = readFileSync(pmdFile);
+    debug(data.toString());
     logProblems(parseData(sourceDir, data));
 }
-run().catch((err) => (0,core.setFailed)(err));
 
 // EXTERNAL MODULE: external "path"
 var external_path_ = __nccwpck_require__(1017);
@@ -29072,20 +29069,16 @@ function checkstyle_run(checkstyleFile, pathTrim = "") {
     (0,core.debug)("checkstyleFile: " + checkstyleFile);
     const data = (0,external_fs_.readFileSync)(checkstyleFile);
     (0,core.debug)(data.toString());
-    logProblems(checkstyle_parseData(trim, data));
+    logProblems_logProblems(checkstyle_parseData(trim, data));
 }
 
 ;// CONCATENATED MODULE: ./src/action.ts
 
 
 async function action_run() {
-    (0,core.debug)("start");
     const checkstyleFile = (0,core.getInput)("file");
-    (0,core.debug)("checkstyleFile: " + checkstyleFile);
     const pathTrim = (0,core.getInput)("pathTrim");
-    (0,core.debug)("pathTrim: " + pathTrim);
     checkstyle_run(checkstyleFile, pathTrim);
-    (0,core.debug)("end");
 }
 action_run().catch((err) => {
     console.log(err.stack);
@@ -29097,3 +29090,4 @@ action_run().catch((err) => {
 module.exports = __webpack_exports__;
 /******/ })()
 ;
+//# sourceMappingURL=index.js.map
