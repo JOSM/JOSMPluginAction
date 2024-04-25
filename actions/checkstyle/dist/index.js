@@ -28909,23 +28909,6 @@ module.exports = parseParams
 /******/ 	}
 /******/ 	
 /************************************************************************/
-/******/ 	/* webpack/runtime/define property getters */
-/******/ 	(() => {
-/******/ 		// define getter functions for harmony exports
-/******/ 		__nccwpck_require__.d = (exports, definition) => {
-/******/ 			for(var key in definition) {
-/******/ 				if(__nccwpck_require__.o(definition, key) && !__nccwpck_require__.o(exports, key)) {
-/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
-/******/ 				}
-/******/ 			}
-/******/ 		};
-/******/ 	})();
-/******/ 	
-/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
-/******/ 	(() => {
-/******/ 		__nccwpck_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
-/******/ 	})();
-/******/ 	
 /******/ 	/* webpack/runtime/make namespace object */
 /******/ 	(() => {
 /******/ 		// define __esModule on exports
@@ -28948,11 +28931,6 @@ var __webpack_exports__ = {};
 "use strict";
 // ESM COMPAT FLAG
 __nccwpck_require__.r(__webpack_exports__);
-
-// EXPORTS
-__nccwpck_require__.d(__webpack_exports__, {
-  "parseData": () => (/* binding */ action_parseData)
-});
 
 // EXTERNAL MODULE: ../../node_modules/@actions/core/lib/core.js
 var core = __nccwpck_require__(7117);
@@ -29029,13 +29007,13 @@ run().catch((err) => (0,core.setFailed)(err));
 
 // EXTERNAL MODULE: external "path"
 var external_path_ = __nccwpck_require__(1017);
-;// CONCATENATED MODULE: ./src/action.ts
+;// CONCATENATED MODULE: ./src/checkstyle.ts
 
 
 
 
 
-function action_parseFile(trim, fileData) {
+function checkstyle_parseFile(trim, fileData) {
     let subFile = fileData["@_name"].split(external_path_.sep);
     let currentlyTrimmed = 0;
     while (!(0,external_fs_.existsSync)((0,external_path_.join)(...subFile))) {
@@ -29066,7 +29044,7 @@ function action_parseFile(trim, fileData) {
     }
     return problems;
 }
-function action_parseData(trim, data) {
+function checkstyle_parseData(trim, data) {
     const alwaysArray = ["checkstyle.file", "checkstyle.file.error"];
     const parser = new fxp.XMLParser({
         ignoreAttributes: false,
@@ -29078,13 +29056,11 @@ function action_parseData(trim, data) {
     const files = parsed["checkstyle"]["file"];
     let problems = [];
     for (const file of files) {
-        problems = problems.concat(action_parseFile(trim, file));
+        problems = problems.concat(checkstyle_parseFile(trim, file));
     }
     return problems;
 }
-async function action_run() {
-    const checkstyleFile = (0,core.getInput)("file");
-    const pathTrim = (0,core.getInput)("pathTrim");
+function checkstyle_run(pathTrim, checkstyleFile) {
     let trim;
     if (pathTrim === "") {
         trim = process.cwd().split(external_path_.sep).length;
@@ -29094,10 +29070,19 @@ async function action_run() {
     }
     const data = (0,external_fs_.readFileSync)(checkstyleFile);
     (0,core.debug)(data.toString());
-    logProblems(action_parseData(trim, data));
+    logProblems(checkstyle_parseData(trim, data));
+}
+
+;// CONCATENATED MODULE: ./src/action.ts
+
+
+async function action_run() {
+    const checkstyleFile = (0,core.getInput)("file");
+    const pathTrim = (0,core.getInput)("pathTrim");
+    checkstyle_run(checkstyleFile, pathTrim);
 }
 action_run().catch((err) => {
-    console.log(err);
+    console.log(err.stack);
     (0,core.setFailed)(err);
 });
 

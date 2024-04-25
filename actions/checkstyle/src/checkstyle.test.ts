@@ -1,4 +1,4 @@
-import { parseData } from "./action";
+import { parseData, run as actionRun } from "./checkstyle";
 import { describe, expect, test } from "@jest/globals";
 import { expectProblem } from "pmd/src/problem.test";
 
@@ -29,5 +29,10 @@ describe("Test action/parseData", () => {
       },
       problems[0],
     );
+  });
+  test("JOSM Checkstyle XML, single file", () => {
+    expect(() =>
+      actionRun("", "/Users/tsmock/workspace/josm/core/checkstyle-josm.xml"),
+    ).not.toThrow();
   });
 });
