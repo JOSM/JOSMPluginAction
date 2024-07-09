@@ -36,11 +36,10 @@ on:
         default: false
         required: false
         description: "Set to true if you want to automatically tag every push to the main branch for use with releasing"
-      additional_build_args:
-        type: string
-        default: ''
-        required: false
-        description: "Use to set additional build arguments"
+    outputs:
+      tag:
+        description: "The release tag"
+        value: ${{ jobs.create_tag.revision }}
 
 jobs:
   josm-build:
@@ -106,7 +105,7 @@ jobs:
     - name: Build with Ant
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
-        ant -noinput -buildfile build.xml -Dplugin.version=${{ steps.version.outputs.version }} ${{ inputs.additional_build_args }}
+        ant -noinput -buildfile build.xml -Dplugin.version=${{ steps.version.outputs.version }}
 
     - name: Upload plugin build
       id: cache-plugin-build
