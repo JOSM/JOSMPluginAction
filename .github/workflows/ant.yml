@@ -117,6 +117,7 @@ jobs:
         ant -noinput -buildfile build.xml -Dplugin.version=${{ steps.version.outputs.version }}
 
     - name: Perform attestation
+      if: ${{ startsWith(github.ref, 'refs/tags/') || inputs.perform-revision-tagging }}
       uses: actions/attest-build-provenance@v1
       with:
         subject-path: josm/dist/${{ inputs.plugin-jar-name }}.jar, josm/dist/${{ inputs.plugin-jar-name }}-sources.jar, josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
