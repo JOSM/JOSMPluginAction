@@ -40,6 +40,9 @@ on:
       tag:
         description: "The release tag"
         value: ${{ jobs.create_tag.outputs.revision }}
+      plugin_directory:
+        description: "The directory that the plugin has been cloned into"
+        value: ${{ jobs.plugin-build.outputs.plugin_directory }}
 
 jobs:
   josm-build:
@@ -79,6 +82,8 @@ jobs:
   plugin-build:
     runs-on: ${{ inputs.operating-system }}
     needs: [josm-build, create_tag]
+    outputs:
+      plugin_directory: ${{ steps.version.outputs.plugin_directory }}
     steps:
     - uses: JOSM/JOSMPluginAction/actions/setup-ant@v2
       with:
@@ -101,6 +106,7 @@ jobs:
           version="$(git describe --tags --always --dirty --broken)"
         fi
         echo "version=${version#v}" >> $GITHUB_OUTPUT
+        echo "plugin_directory=josm/plugins/${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
 
     - name: Build with Ant
       run: |
