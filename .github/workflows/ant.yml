@@ -84,6 +84,9 @@ jobs:
     needs: [josm-build, create_tag]
     outputs:
       plugin_directory: ${{ steps.version.outputs.plugin_directory }}
+    permissions:
+      id-token: write
+      attestations: write
     steps:
     - uses: JOSM/JOSMPluginAction/actions/setup-ant@v2
       with:
@@ -112,6 +115,15 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
         ant -noinput -buildfile build.xml -Dplugin.version=${{ steps.version.outputs.version }}
+
+    - name: Perform attestation (jar)
+      uses: actions/attest-build-provenance@v1
+      with:
+        subject-path: josm/dist/${{ inputs.plugin-jar-name }}.jar
+    - name: Perform attestation (sources)
+      uses: actions/attest-build-provenance@v1
+      with:
+        subject-path: josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
 
     - name: Upload plugin build
       id: cache-plugin-build

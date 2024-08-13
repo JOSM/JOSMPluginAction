@@ -42,6 +42,9 @@ on:
 
 jobs:
   call-workflow:
+    permissions:
+      id-token: write
+      attestations: write
     uses: JOSM/JOSMPluginAction/.github/workflows/ant.yml@v2
 ```
 
