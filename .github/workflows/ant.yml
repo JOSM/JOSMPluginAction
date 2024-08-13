@@ -116,14 +116,10 @@ jobs:
         cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
         ant -noinput -buildfile build.xml -Dplugin.version=${{ steps.version.outputs.version }}
 
-    - name: Perform attestation (jar)
+    - name: Perform attestation
       uses: actions/attest-build-provenance@v1
       with:
-        subject-path: josm/dist/${{ inputs.plugin-jar-name }}.jar
-    - name: Perform attestation (sources)
-      uses: actions/attest-build-provenance@v1
-      with:
-        subject-path: josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
+        subject-path: josm/dist/${{ inputs.plugin-jar-name }}.jar, josm/dist/${{ inputs.plugin-jar-name }}-sources.jar, josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
 
     - name: Upload plugin build
       id: cache-plugin-build

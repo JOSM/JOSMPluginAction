@@ -45,8 +45,15 @@ jobs:
     permissions:
       id-token: write
       attestations: write
+      contents: write
+      packages: write
     uses: JOSM/JOSMPluginAction/.github/workflows/ant.yml@v2
 ```
+
+## Permissions reference:
+* `id-token` and `attestations`: For writing attestation information
+* `contents`: For auto tags and creating a release
+* `packages`: For pushing to a GH package repo
 
 ## Inputs (all optional)
 ### `josm-revision`
