@@ -39,7 +39,7 @@ on:
     outputs:
       tag:
         description: "The release tag"
-        value: ${{ jobs.create_tag.revision }}
+        value: ${{ jobs.create_tag.outputs.revision }}
 
 jobs:
   josm-build:
