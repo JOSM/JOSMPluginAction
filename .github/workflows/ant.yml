@@ -36,6 +36,11 @@ on:
         default: false
         required: false
         description: "Set to true if you want to automatically tag every push to the main branch for use with releasing"
+      revision-offset:
+        type: number
+        default: 0
+        required: false
+        description: "Set to an offset for automatic tagging. For example, if the last plugin version was 100, but there are only 20 commits, then this should be 80"
     outputs:
       tag:
         description: "The release tag"
@@ -74,7 +79,7 @@ jobs:
         id: create_revision
         # Count the total commits for this branch
         run: |
-          revision="v$(git rev-list --count HEAD)"
+          revision="v$(($(git rev-list --count HEAD) + ${{ inputs.revision-offset }}))"
           git tag $revision
           git push -u origin $revision
           echo "revision=$revision" >> $GITHUB_OUTPUT
