@@ -28183,7 +28183,7 @@ async function cloneJosmFiles(directory) {
         (0,path__WEBPACK_IMPORTED_MODULE_2__.join)(directory, "josm", "core", "ivy.xml"),
         (0,path__WEBPACK_IMPORTED_MODULE_2__.join)(directory, "josm", "core", "ivysettings.xml"),
         (0,path__WEBPACK_IMPORTED_MODULE_2__.join)(directory, "josm", "core", "pom.xml"),
-        (0,path__WEBPACK_IMPORTED_MODULE_2__.join)(directory, "josm", "core", "nodist", "ivysettings.xml"),
+        (0,path__WEBPACK_IMPORTED_MODULE_2__.join)(directory, "josm", "core", "nodist", "pom.xml"),
     ]);
     await cloneCoreSubRepos((0,path__WEBPACK_IMPORTED_MODULE_2__.join)(directory, "josm", "plugins"), null);
 }
