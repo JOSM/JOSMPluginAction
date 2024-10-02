@@ -78365,6 +78365,17 @@ async function dependencies(pluginDir) {
                 await (0,cache.saveCache)(corePaths, coreKey);
             }
         });
+        if ((0,external_fs_.existsSync)((0,external_path_.join)(pluginDir, "pom.xml"))) {
+            const mavenPluginCache = await (0,cache.restoreCache)(["~/.ivy2/cache", "~/.ant/cache", "~/.m2/repository"], `${process.platform}-${process.arch}-mvn-plugin-${await (0,glob.hashFiles)("josm/plugins/**/pom.xml\n" + "josm/plugins/**/ivy.xml")}`);
+            if (mavenPluginCache == null) {
+                await (0,exec.exec)("ant", [
+                    "-buildfile",
+                    (0,external_path_.join)(pluginDir, "build.xml"),
+                    "fetch_dependencies",
+                ]);
+                await (0,cache.saveCache)(["~/.ivy2/cache/", "~/.ant/cache", "~/.m2/repository"], `${process.platform}-${process.arch}-mvn-plugin-${await (0,glob.hashFiles)("josm/plugins/**/pom.xml\n" + "josm/plugins/**/ivy.xml")}`);
+            }
+        }
         if ((0,external_fs_.existsSync)((0,external_path_.join)(pluginDir, "ivy.xml"))) {
             const ivyPluginCache = await (0,cache.restoreCache)(["~/.ivy2/cache", "~/.ant/cache"], `${process.platform}-${process.arch}-ivy-plugin-${await (0,glob.hashFiles)("josm/plugins/**/ivy.xml")}`);
             if (ivyPluginCache == null) {

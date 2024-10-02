@@ -54,6 +54,27 @@ async function dependencies(pluginDir: string): Promise<void> {
         await saveCache(corePaths, coreKey);
       }
     });
+    if (existsSync(join(pluginDir, "pom.xml"))) {
+      const mavenPluginCache = await restoreCache(
+        ["~/.ivy2/cache", "~/.ant/cache", "~/.m2/repository"],
+        `${process.platform}-${process.arch}-mvn-plugin-${await hashFiles(
+          "josm/plugins/**/pom.xml\n" + "josm/plugins/**/ivy.xml",
+        )}`,
+      );
+      if (mavenPluginCache == null) {
+        await exec("ant", [
+          "-buildfile",
+          join(pluginDir, "build.xml"),
+          "fetch_dependencies",
+        ]);
+        await saveCache(
+          ["~/.ivy2/cache/", "~/.ant/cache", "~/.m2/repository"],
+          `${process.platform}-${process.arch}-mvn-plugin-${await hashFiles(
+            "josm/plugins/**/pom.xml\n" + "josm/plugins/**/ivy.xml",
+          )}`,
+        );
+      }
+    }
     if (existsSync(join(pluginDir, "ivy.xml"))) {
       const ivyPluginCache = await restoreCache(
         ["~/.ivy2/cache", "~/.ant/cache"],
