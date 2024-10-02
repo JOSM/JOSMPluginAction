@@ -69,6 +69,11 @@ async function cloneJosmFiles(directory: string): Promise<void> {
   await cloneCoreSubRepos(join(directory, "josm"), "empty");
   await exec("svn", [
     "update",
+    "--set-depth=empty",
+    join(directory, "josm", "core", "nodist"),
+  ]);
+  await exec("svn", [
+    "update",
     join(directory, "josm", "core", "ivy.xml"),
     join(directory, "josm", "core", "ivysettings.xml"),
     join(directory, "josm", "core", "pom.xml"),
