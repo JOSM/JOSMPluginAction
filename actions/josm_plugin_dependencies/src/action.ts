@@ -43,7 +43,7 @@ async function dependencies(pluginDir: string): Promise<void> {
     );
     await group("Tool dependencies", async () => {
       const coreTools = join("josm", "plugins", "00_core_tools");
-      const corePaths = ["~/.ivy2/cache", "~/.ant/cache"];
+      const corePaths = ["~/.ivy2/cache", "~/.ant/cache", "~/.m2/repository"];
       const coreKey = await hashFiles(join(coreTools, "ivy.xml"));
       if ((await restoreCache(corePaths, coreKey)) == null) {
         await exec("ant", [

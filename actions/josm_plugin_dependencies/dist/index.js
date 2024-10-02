@@ -78354,7 +78354,7 @@ async function dependencies(pluginDir) {
         await (0,cache.restoreCache)(["~/.ivy2/cache", "~/.ant/cache", "josm/core/tools"], `${process.platform}-${process.arch}-ivy-${await (0,glob.hashFiles)("josm/core/**/ivy.xml")}`);
         await (0,core.group)("Tool dependencies", async () => {
             const coreTools = (0,external_path_.join)("josm", "plugins", "00_core_tools");
-            const corePaths = ["~/.ivy2/cache", "~/.ant/cache"];
+            const corePaths = ["~/.ivy2/cache", "~/.ant/cache", "~/.m2/repository"];
             const coreKey = await (0,glob.hashFiles)((0,external_path_.join)(coreTools, "ivy.xml"));
             if ((await (0,cache.restoreCache)(corePaths, coreKey)) == null) {
                 await (0,exec.exec)("ant", [
