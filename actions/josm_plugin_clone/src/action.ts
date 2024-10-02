@@ -71,6 +71,8 @@ async function cloneJosmFiles(directory: string): Promise<void> {
     "update",
     join(directory, "josm", "core", "ivy.xml"),
     join(directory, "josm", "core", "ivysettings.xml"),
+    join(directory, "josm", "core", "pom.xml"),
+    join(directory, "josm", "core", "nodist", "ivysettings.xml"),
   ]);
   await cloneCoreSubRepos(join(directory, "josm", "plugins"), null);
 }
