@@ -47,7 +47,7 @@ jobs:
       attestations: write
       contents: write
       packages: write
-    uses: JOSM/JOSMPluginAction/.github/workflows/ant.yml@v2
+    uses: JOSM/JOSMPluginAction/.github/workflows/ant.yml@v3
 ```
 
 ## Permissions reference:

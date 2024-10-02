@@ -42,14 +42,14 @@ runs:
 
   - name: Clone JOSM plugin directories
     id: josm-plugin-clone
-    uses: JOSM/JOSMPluginAction/actions/josm_plugin_clone@v2
+    uses: JOSM/JOSMPluginAction/actions/josm_plugin_clone@v3
 
   - uses: actions/checkout@v4
     with:
       path: ${{ steps.josm-plugin-clone.outputs.plugin-dir }}/${{ github.event.repository.name }}
       fetch-depth: ${{ inputs.fetch-depth }}
   - name: Get plugin dependencies
-    uses: JOSM/JOSMPluginAction/actions/josm_plugin_dependencies@v2
+    uses: JOSM/JOSMPluginAction/actions/josm_plugin_dependencies@v3
     with:
       plugin-dir: ${{ steps.josm-plugin-clone.outputs.plugin-dir }}/${{ github.event.repository.name }}
       josm-revision: ${{ inputs.josm-revision }}

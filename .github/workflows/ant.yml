@@ -61,7 +61,7 @@ jobs:
         distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
     - id: josm-build
-      uses: JOSM/JOSMPluginAction/actions/josm_build@v2
+      uses: JOSM/JOSMPluginAction/actions/josm_build@v3
       with:
         josm-revision: ${{ inputs.josm-revision }}
 
@@ -93,10 +93,10 @@ jobs:
       id-token: write
       attestations: write
     steps:
-    - uses: JOSM/JOSMPluginAction/actions/setup-ant@v2
+    - uses: JOSM/JOSMPluginAction/actions/setup-ant@v3
       with:
         ant-version: ${{ inputs.ant-version }}
-    - uses: JOSM/JOSMPluginAction/actions/plugin_clone@v2
+    - uses: JOSM/JOSMPluginAction/actions/plugin_clone@v3
       with:
         java-distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
@@ -141,10 +141,10 @@ jobs:
     runs-on: ${{ inputs.operating-system }}
     needs: [josm-build, plugin-build]
     steps:
-    - uses: JOSM/JOSMPluginAction/actions/setup-ant@v2
+    - uses: JOSM/JOSMPluginAction/actions/setup-ant@v3
       with:
         ant-version: ${{ inputs.ant-version }}
-    - uses: JOSM/JOSMPluginAction/actions/plugin_clone@v2
+    - uses: JOSM/JOSMPluginAction/actions/plugin_clone@v3
       with:
         java-distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
