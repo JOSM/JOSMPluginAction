@@ -59,7 +59,7 @@ jobs:
     - name: Install subversion
       run: |
         if [ -z "$(which svn)" ] && [ "${{ runner.os }}" == "Linux" ]; then
-          apt-get update && apt-get install -y subversion
+          sudo apt-get update && sudo apt-get install -y subversion
         fi
     - uses: actions/setup-java@v4
       with:
@@ -101,7 +101,7 @@ jobs:
     - name: Install subversion
       run: |
         if [ -z "$(which svn)" ] && [ "${{ runner.os }}" == "Linux" ]; then
-          apt-get update && apt-get install -y subversion
+          sudo apt-get update && sudo apt-get install -y subversion
         fi
     - uses: JOSM/JOSMPluginAction/actions/setup-ant@v3
       with:
