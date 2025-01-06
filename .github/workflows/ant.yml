@@ -93,6 +93,11 @@ jobs:
       id-token: write
       attestations: write
     steps:
+    - name: Install subversion
+      run: |
+        if [ -z "$(which svn)" ] && [ "${{ runner.os }}" == "Linux" ]; then
+          apt-get update && apt-get install -y subversion
+        fi
     - uses: JOSM/JOSMPluginAction/actions/setup-ant@v3
       with:
         ant-version: ${{ inputs.ant-version }}
