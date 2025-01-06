@@ -56,6 +56,11 @@ jobs:
       josm-revision: ${{ steps.josm-build.outputs.josm-revision }}
       josm-test-revision: ${{ steps.josm-build.outputs.josm-test-revision }}
     steps:
+    - name: Install subversion
+      run: |
+        if [ -z "$(which svn)" ] && [ "${{ runner.os }}" == "Linux" ]; then
+          apt-get update && apt-get install -y subversion
+        fi
     - uses: actions/setup-java@v4
       with:
         distribution: ${{ inputs.java-distribution }}
