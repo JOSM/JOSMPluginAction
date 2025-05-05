@@ -159,6 +159,7 @@ jobs:
       if: ${{ hashFiles('josm/plugins/${{ inputs.plugin-directory }}/pom.xml') != '' }}
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ inputs.plugin-directory }}
+        mvn --file ../pom.xml package install --projects org.openstreetmap.josm:josm,org.openstreetmap.josm:josm-unittest -DskipTests
         mvn --file pom.xml -Dplugin.version=${{ steps.version.outputs.version }} javadoc:jar sources:jar -DskipTests
 
     - name: Perform attestation
