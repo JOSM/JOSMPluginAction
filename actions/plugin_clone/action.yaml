@@ -25,6 +25,18 @@ inputs:
     default: '1'
     required: false
     description: "The number of commits to fetch. 0 indicates all history for all branches and tags. Default: 1"
+  repository:
+    default: ${{ github.repository }}
+    required: false
+    description: "A variable used for developing the GitHub Action. See actions/checkout@v4."
+  ref:
+    default: ''
+    required: false
+    description: "A variable used for developing the GitHub Action. See actions/checkout@v4."
+  plugin-directory:
+    default: ${{ github.event.repository.name }}
+    required: false
+    description: "A variable used for developing the GitHub Action. We change directory to this prior to running build actions."
 
 outputs:
   plugin-directory:
@@ -46,12 +58,14 @@ runs:
 
   - uses: actions/checkout@v4
     with:
-      path: ${{ steps.josm-plugin-clone.outputs.plugin-dir }}/${{ github.event.repository.name }}
+      path: ${{ steps.josm-plugin-clone.outputs.plugin-dir }}/${{ inputs.plugin-directory }}
       fetch-depth: ${{ inputs.fetch-depth }}
+      repository: '${{ inputs.repository }}'
+      ref: ${{ inputs.ref }}
   - name: Get plugin dependencies
     uses: JOSM/JOSMPluginAction/actions/josm_plugin_dependencies@v3
     with:
-      plugin-dir: ${{ steps.josm-plugin-clone.outputs.plugin-dir }}/${{ github.event.repository.name }}
+      plugin-dir: ${{ steps.josm-plugin-clone.outputs.plugin-dir }}/${{ inputs.plugin-directory }}
       josm-revision: ${{ inputs.josm-revision }}
       josm-test-revision: ${{ inputs.josm-test-revision }}
       plugin-jar-name: ${{ inputs.plugin-jar-name }}
