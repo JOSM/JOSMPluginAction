@@ -76,7 +76,7 @@ jobs:
         distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
     - id: josm-build
-      uses: JOSM/JOSMPluginAction/actions/josm_build@v3
+      uses: JOSM/JOSMPluginAction/actions/josm_build@main
       with:
         josm-revision: ${{ inputs.josm-revision }}
 
@@ -115,10 +115,10 @@ jobs:
         if [ -z "$(which svn)" ] && [ "${{ runner.os }}" == "Linux" ]; then
           sudo apt-get update && sudo apt-get install -y subversion
         fi
-    - uses: JOSM/JOSMPluginAction/actions/setup-ant@v3
+    - uses: JOSM/JOSMPluginAction/actions/setup-ant@main
       with:
         ant-version: ${{ inputs.ant-version }}
-    - uses: JOSM/JOSMPluginAction/actions/plugin_clone@v3
+    - uses: JOSM/JOSMPluginAction/actions/plugin_clone@main
       with:
         java-distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
@@ -168,10 +168,10 @@ jobs:
         if [ -z "$(which svn)" ] && [ "${{ runner.os }}" == "Linux" ]; then
           sudo apt-get update && sudo apt-get install -y subversion
         fi
-    - uses: JOSM/JOSMPluginAction/actions/setup-ant@v3
+    - uses: JOSM/JOSMPluginAction/actions/setup-ant@main
       with:
         ant-version: ${{ inputs.ant-version }}
-    - uses: JOSM/JOSMPluginAction/actions/plugin_clone@v3
+    - uses: JOSM/JOSMPluginAction/actions/plugin_clone@main
       with:
         java-distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
