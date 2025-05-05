@@ -1,12 +1,12 @@
 on:
   push:
     branches:
-      - master
+      - main
       - $default-branch
       - $protected-branches
   pull_request:
     branches:
-      - master
+      - main
       - $default-branch
   workflow_dispatch:
 
