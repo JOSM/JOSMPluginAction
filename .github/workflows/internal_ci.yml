@@ -22,11 +22,14 @@ jobs:
     with:
       josm-revision: ""
       java-version: 17
+      repository: 'JOSM/Mapillary'
+      ref: 'master'
+      plugin-directory: 'Mapillary'
   call-workflow-min:
     uses: JOSM/JOSMPluginAction/.github/workflows/internal_ant.yml@main
     with:
       josm-revision: "r19387"
       java-version: 17
-      perform-revision-tagging: false
       repository: 'JOSM/Mapillary'
       ref: 'master'
+      plugin-directory: 'Mapillary'

@@ -25,7 +25,7 @@ on:
         required: false
       plugin-jar-name:
         type: string
-        default: ${{ github.event.repository.name }}
+        default: ${{ inputs.plugin-directory }}
         description: "The base name of the jar file, if not the repository name. Only useful in conjunction with `update-pluginssource`."
         required: false
       ant-version:
@@ -51,6 +51,11 @@ on:
         default: ''
         required: false
         description: "A variable used for developing the GitHub Action. See actions/checkout@v4."
+      plugin-directory:
+        type: string
+        default: ${{ github.event.repository.name }}
+        required: false
+        description: "A variable used for developing the GitHub Action. We change directory to this prior to running build actions."
     outputs:
       tag:
         description: "The release tag"
@@ -129,18 +134,18 @@ jobs:
     - name: Set version information
       id: version
       run: |
-        cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
+        cd $GITHUB_WORKSPACE/josm/plugins/${{ inputs.plugin-directory }}
         if [ $GITHUB_REF_TYPE == "tag" ]; then
           version=$GITHUB_REF_NAME
         else
           version="$(git describe --tags --always --dirty --broken)"
         fi
         echo "version=${version#v}" >> $GITHUB_OUTPUT
-        echo "plugin_directory=josm/plugins/${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+        echo "plugin_directory=josm/plugins/${{ inputs.plugin-directory }}" >> $GITHUB_OUTPUT
 
     - name: Build with Ant
       run: |
-        cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
+        cd $GITHUB_WORKSPACE/josm/plugins/${{ inputs.plugin-directory }}
         ant -noinput -buildfile build.xml -Dplugin.version=${{ steps.version.outputs.version }}
 
     - name: Perform attestation
@@ -181,7 +186,7 @@ jobs:
     - name: Check if ivy.xml exists
       id: ivy-file-check
       run: |
-        if [ -f "josm/plugins/${{ github.event.repository.name }}/ivy.xml" ]; then
+        if [ -f "josm/plugins/${{ inputs.plugin-directory }}/ivy.xml" ]; then
           echo "ivy-xml=true" >> $GITHUB_OUTPUT
         else
           echo "ivy-xml=false" >> $GITHUB_OUTPUT
@@ -201,7 +206,7 @@ jobs:
     - name: Test with Ant
       id: ant-test
       run: |
-        cd $GITHUB_WORKSPACE/josm/plugins/${{ github.event.repository.name }}
+        cd $GITHUB_WORKSPACE/josm/plugins/${{ inputs.plugin-directory }}
         # Not all plugins have tests.
         if [ -d "test" ]; then TEST_REPORT_PATH="test/report"; elif [ -d "src/test" ]; then TEST_REPORT_PATH="src/test/report"; else exit 0; fi
         echo "TEST_REPORT_PATH=${TEST_REPORT_PATH}" >> $GITHUB_ENV
@@ -214,15 +219,15 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: Ant reports for JOSM plugin ${{ github.event.repository.name }}-${{ inputs.java-version }}-${{ needs.josm-build.outputs.josm-revision }}
+        name: Ant reports for JOSM plugin ${{ inputs.plugin-directory }}-${{ inputs.java-version }}-${{ needs.josm-build.outputs.josm-revision }}
         path: |
-          josm/plugins/${{ github.event.repository.name }}/${{ env.TEST_REPORT_PATH }}/*.txt
-          josm/plugins/${{ github.event.repository.name }}/${{ env.TEST_REPORT_PATH }}/TEST*.xml
+          josm/plugins/${{ inputs.plugin-directory }}/${{ env.TEST_REPORT_PATH }}/*.txt
+          josm/plugins/${{ inputs.plugin-directory }}/${{ env.TEST_REPORT_PATH }}/TEST*.xml
     - name: Publish Test Report
       uses: mikepenz/action-junit-report@v4
       if: always() # always run even if the previous step fails
       with:
-        report_paths: 'josm/plugins/${{ github.event.repository.name }}/${{ env.TEST_REPORT_PATH }}/TEST*.xml'
+        report_paths: 'josm/plugins/${{ inputs.plugin-directory }}/${{ env.TEST_REPORT_PATH }}/TEST*.xml'
         fail_on_failure: true
 
   release:
