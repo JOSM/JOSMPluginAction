@@ -30,7 +30,7 @@ on:
         required: false
       ant-version:
         type: string
-        default: 'apache-ant-1.10.14'
+        default: 'apache-ant-1.10.15'
       perform-revision-tagging:
         type: boolean
         default: false
@@ -41,6 +41,21 @@ on:
         default: 0
         required: false
         description: "Set to an offset for automatic tagging. For example, if the last plugin version was 100, but there are only 20 commits, then this should be 80"
+      repository:
+        type: string
+        default: ${{ github.repository }}
+        required: false
+        description: "A variable used for developing the GitHub Action. See actions/checkout@v4."
+      ref:
+        type: string
+        default: ''
+        required: false
+        description: "A variable used for developing the GitHub Action. See actions/checkout@v4."
+      action_version:
+        type: string
+        default: 'v3'
+        required: false
+        description: "A variable used for developing the GitHub Action."
     outputs:
       tag:
         description: "The release tag"
@@ -66,7 +81,7 @@ jobs:
         distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
     - id: josm-build
-      uses: JOSM/JOSMPluginAction/actions/josm_build@v3
+      uses: JOSM/JOSMPluginAction/actions/josm_build@${{ inputs.action_version }}
       with:
         josm-revision: ${{ inputs.josm-revision }}
 
@@ -79,6 +94,8 @@ jobs:
         if: ${{ inputs.perform-revision-tagging }}
         with:
           fetch-depth: 0
+          repository: '${{ inputs.repository }}'
+          ref: '${{ inputs.ref }}'
       - name: Set revision env variable
         if: ${{ inputs.perform-revision-tagging }}
         id: create_revision
@@ -103,10 +120,10 @@ jobs:
         if [ -z "$(which svn)" ] && [ "${{ runner.os }}" == "Linux" ]; then
           sudo apt-get update && sudo apt-get install -y subversion
         fi
-    - uses: JOSM/JOSMPluginAction/actions/setup-ant@v3
+    - uses: JOSM/JOSMPluginAction/actions/setup-ant@${{ inputs.action_version }}
       with:
         ant-version: ${{ inputs.ant-version }}
-    - uses: JOSM/JOSMPluginAction/actions/plugin_clone@v3
+    - uses: JOSM/JOSMPluginAction/actions/plugin_clone@v${{ inputs.action_version }}
       with:
         java-distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
@@ -156,10 +173,10 @@ jobs:
         if [ -z "$(which svn)" ] && [ "${{ runner.os }}" == "Linux" ]; then
           sudo apt-get update && sudo apt-get install -y subversion
         fi
-    - uses: JOSM/JOSMPluginAction/actions/setup-ant@v3
+    - uses: JOSM/JOSMPluginAction/actions/setup-ant@${{ inputs.action_version }}
       with:
         ant-version: ${{ inputs.ant-version }}
-    - uses: JOSM/JOSMPluginAction/actions/plugin_clone@v3
+    - uses: JOSM/JOSMPluginAction/actions/plugin_clone@${{ inputs.action_version }}
       with:
         java-distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
