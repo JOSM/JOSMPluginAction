@@ -185,6 +185,9 @@ jobs:
         java-version: ${{ inputs.java-version }}
         josm-revision: ${{ needs.josm-build.outputs.josm-revision }}
         josm-test-revision: ${{ needs.josm-build.outputs.josm-test-revision }}
+        repository: ${{ inputs.repository }}
+        ref: ${{ inputs.ref }}
+        plugin-directory: ${{ inputs.plugin-directory }}
 
     - name: Check if ivy.xml exists
       id: ivy-file-check
