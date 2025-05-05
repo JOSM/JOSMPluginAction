@@ -160,7 +160,9 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ inputs.plugin-directory }}
         mvn --file ../pom.xml package install --projects org.openstreetmap.josm:josm,org.openstreetmap.josm:josm-unittest -DskipTests
-        mvn --file pom.xml -Dplugin.version=${{ steps.version.outputs.version }} javadoc:jar sources:jar -DskipTests
+        mvn --file pom.xml package javadoc:jar source:jar -DskipTests -Dplugin.dist.dir=../../dist -Dplugin.version=${{ steps.version.outputs.version }}
+        mv target/${{ inputs.plugin-jar-name }}-*-sources.jar ../../dist/${{ inputs.plugin-jar-name }}-sources.jar
+        mv target/${{ inputs.plugin-jar-name }}-*-javadoc.jar ../../dist/${{ inputs.plugin-jar-name }}-javadoc.jar
 
     - name: Perform attestation
       if: ${{ startsWith(github.ref, 'refs/tags/') || inputs.perform-revision-tagging }}
@@ -170,9 +172,6 @@ jobs:
           josm/dist/${{ inputs.plugin-jar-name }}.jar
           josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
           josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
-          josm/distMaven/${{ inputs.plugin-jar-name }}.jar
-          josm/plugins/${{ inputs.plugin-directory }}/target/${{ inputs.plugin-jar-name }}-*-sources.jar
-          josm/plugins/${{ inputs.plugin-directory }}/target/${{ inputs.plugin-jar-name }}-*-javadoc.jar
 
     - name: Upload plugin build
       id: cache-plugin-build
@@ -183,9 +182,6 @@ jobs:
           josm/dist/${{ inputs.plugin-jar-name }}.jar
           josm/dist/${{ inputs.plugin-jar-name }}-javadoc.jar
           josm/dist/${{ inputs.plugin-jar-name }}-sources.jar
-          josm/distMaven/${{ inputs.plugin-jar-name }}.jar
-          josm/plugins/${{ inputs.plugin-directory }}/target/${{ inputs.plugin-jar-name }}-*-sources.jar
-          josm/plugins/${{ inputs.plugin-directory }}/target/${{ inputs.plugin-jar-name }}-*-javadoc.jar
 
   plugin-test:
     runs-on: ${{ inputs.operating-system }}
