@@ -137,6 +137,8 @@ async function buildJosmTests(
     process.chdir(josmSource + "/test");
     await exec("mvn", [
       "--file",
+      "../nodist/pom.xml",
+      "--file",
       "pom.xml",
       "package",
       "install",
