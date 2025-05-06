@@ -61,18 +61,28 @@ async function buildJosm(
     info("Cache hit for " + buildHit);
     return;
   }
-  const ivyFiles = await hashFiles("**/ivy.xml");
+  const ivyFiles = await hashFiles("**/ivy.xml\n**/pom.xml");
   const ivyHit = await restoreCache(
-    ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
+    ["~/.ivy2/cache", "~/.ant/cache", "~/.m2", josmSource + "/tools"],
     `${process.platform}-${process.arch}-ivy-${ivyFiles}`,
   );
   if (ivyHit == null || ivyHit === "") {
     await exec("ant", ["-buildfile", josmSource + "/build.xml", "resolve"]);
+    await exec("mvn", ["clean", "validate"]);
     await saveCache(
-      ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
+      ["~/.ivy2/cache", "~/.ant/cache", "~/.m2", josmSource + "/tools"],
       `${process.platform}-${process.arch}-ivy-${ivyFiles}`,
     );
   }
+  // Build with maven
+  await exec("mvn", [
+    "--file",
+    josmSource + "/pom.xml",
+    "package",
+    "install",
+    "-DskipTests",
+  ]);
+  // And then ant, since that is currently the "official" distribution source.
   await exec("ant", ["-buildfile", josmSource + "/build.xml", "dist"]);
   await saveCache(
     [josmSource + "/dist/josm-custom.jar"],
@@ -94,19 +104,28 @@ async function buildJosmTests(
     return;
   }
   await buildJosm(josmSource, josmRevision);
-  const ivyFiles = await hashFiles(josmSource + "/**/ivy.xml");
+  const ivyFiles = await hashFiles(
+    josmSource + "/**/ivy.xml" + "\n" + josmSource + "/**/pom.xml",
+  );
   const ivyHit = await restoreCache(
-    ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
+    ["~/.ivy2/cache", "~/.ant/cache", "~/.m2", josmSource + "/tools"],
     `${process.platform}-${process.arch}-test-ivy-${ivyFiles}`,
   );
   if (ivyHit == null || ivyHit === "") {
     await exec("ant", ["-buildfile", josmSource + "/build.xml", "test-init"]);
     await saveCache(
-      ["~/.ivy2/cache", "~/.ant/cache", josmSource + "/tools"],
+      ["~/.ivy2/cache", "~/.ant/cache", "~/.m2", josmSource + "/tools"],
       `${process.platform}-${process.arch}-test-ivy-${ivyFiles}`,
     );
   }
   await exec("ant", ["-buildfile", josmSource + "/build.xml", "test-compile"]);
+  await exec("mvn", [
+    "--file",
+    josmSource + "/test/pom.xml",
+    "package",
+    "install",
+    "-DskipTests",
+  ]);
   await saveCache([josmSource + "/test/build"], `josm-tests-r${josmRevision}`);
 }
 

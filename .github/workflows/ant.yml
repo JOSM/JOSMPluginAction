@@ -165,12 +165,11 @@ jobs:
       run: |
         set -ex
         cd $GITHUB_WORKSPACE/josm/plugins/${{ inputs.plugin-directory }}
-        svn up ../../core
+        svn up ../../core/tools
         ls ../..
         ls ../../core
         ls ../../core/tools
         ls ../../core/tools/checkstyle
-        mvn --file ../../core/pom.xml package install -DskipTests
         mvn --file pom.xml package javadoc:jar source:jar -DskipTests -Dplugin.dist.dir=../../dist -Dplugin.version=${{ steps.version.outputs.version }}
         mv target/${{ inputs.plugin-jar-name }}-*-sources.jar ../../dist/${{ inputs.plugin-jar-name }}-sources.jar
         mv target/${{ inputs.plugin-jar-name }}-*-javadoc.jar ../../dist/${{ inputs.plugin-jar-name }}-javadoc.jar
