@@ -23,6 +23,11 @@ on:
         default: temurin
         description: The java distribution to build against
         required: false
+      plugin-directory:
+        type: string
+        default: ${{ github.event.repository.name }}
+        required: false
+        description: "A variable used for developing the GitHub Action. We change directory to this prior to running build actions."
       plugin-jar-name:
         type: string
         default: ${{ inputs.plugin-directory }}
@@ -51,11 +56,6 @@ on:
         default: ''
         required: false
         description: "A variable used for developing the GitHub Action. See actions/checkout@v4."
-      plugin-directory:
-        type: string
-        default: ${{ github.event.repository.name }}
-        required: false
-        description: "A variable used for developing the GitHub Action. We change directory to this prior to running build actions."
     outputs:
       tag:
         description: "The release tag"
