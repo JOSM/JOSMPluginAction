@@ -149,14 +149,14 @@ jobs:
     - name: Build with Ant
       id: build-ant
       # Don't build with ant if we can build with maven
-      if: ${{ hashFiles('josm/plugins/${{ inputs.plugin-directory }}/build.xml') != ''  && hashFiles('josm/plugins/${{ inputs.plugin-directory }}/pom.xml') == ''}}
+      if: ${{ hashFiles(format('josm/plugins/${0}/build.xml', inputs.plugin-directory)) != ''  && hashFiles(format('josm/plugins/${0}/pom.xml', inputs.plugin-directory)) == ''}}
       run: |
         # Note: This should be deprecated at some point.
         cd $GITHUB_WORKSPACE/josm/plugins/${{ inputs.plugin-directory }}
         ant -noinput -buildfile build.xml -Dplugin.version=${{ steps.version.outputs.version }}
 
     - name: Build with maven
-      if: ${{ hashFiles('josm/plugins/${{ inputs.plugin-directory }}/pom.xml') != '' }}
+      if: ${{ hashFiles(format('josm/plugins/${0}/pom.xml', inputs.plugin-directory)) != '' }}
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ inputs.plugin-directory }}
         mvn --file ../pom.xml package install --projects org.openstreetmap.josm:josm,org.openstreetmap.josm:josm-unittest -DskipTests
