@@ -30,7 +30,7 @@ on:
         description: "A variable used for developing the GitHub Action. We change directory to this prior to running build actions."
       plugin-jar-name:
         type: string
-        default: ${{ inputs.plugin-directory }}
+        default: ${{ github.event.repository.name }}
         description: "The base name of the jar file, if not the repository name. Only useful in conjunction with `update-pluginssource`."
         required: false
       ant-version:
