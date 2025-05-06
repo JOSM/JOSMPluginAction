@@ -125,13 +125,19 @@ async function buildJosmTests(
     );
   }
   await exec("ant", ["-buildfile", josmSource + "/build.xml", "test-compile"]);
-  await exec("mvn", [
-    "--file",
-    josmSource + "/test/pom.xml",
-    "package",
-    "install",
-    "-DskipTests",
-  ]);
+  const cwd = process.cwd();
+  try {
+    process.chdir(josmSource + "/test");
+    await exec("mvn", [
+      "--file",
+      josmSource + "/test/pom.xml",
+      "package",
+      "install",
+      "-DskipTests",
+    ]);
+  } finally {
+    process.chdir(cwd);
+  }
   await saveCache([josmSource + "/test/build"], `josm-tests-r${josmRevision}`);
 }
 
