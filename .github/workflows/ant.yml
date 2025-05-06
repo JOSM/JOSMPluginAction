@@ -165,6 +165,7 @@ jobs:
       run: |
         set -ex
         cd $GITHUB_WORKSPACE/josm/plugins/${{ inputs.plugin-directory }}
+        svn up ../../core
         ls ../..
         ls ../../core
         ls ../../core/tools
