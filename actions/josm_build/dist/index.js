@@ -80123,7 +80123,7 @@ async function buildJosmTests(josmSource, josmRevision) {
         process.chdir(josmSource + "/test");
         await (0,exec.exec)("mvn", [
             "--file",
-            josmSource + "/test/pom.xml",
+            "pom.xml",
             "package",
             "install",
             "-DskipTests",
