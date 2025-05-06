@@ -80118,6 +80118,13 @@ async function buildJosmTests(josmSource, josmRevision) {
         await (0,cache.saveCache)(["~/.ivy2/cache", "~/.ant/cache", "~/.m2", josmSource + "/tools"], `${process.platform}-${process.arch}-test-ivy-${ivyFiles}`);
     }
     await (0,exec.exec)("ant", ["-buildfile", josmSource + "/build.xml", "test-compile"]);
+    await (0,exec.exec)("mvn", [
+        "--file",
+        josmSource + "/pom.xml",
+        "package",
+        "install",
+        "-DskipTests",
+    ]);
     const cwd = process.cwd();
     try {
         process.chdir(josmSource + "/test");

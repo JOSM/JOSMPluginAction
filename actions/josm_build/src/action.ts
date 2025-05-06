@@ -125,6 +125,13 @@ async function buildJosmTests(
     );
   }
   await exec("ant", ["-buildfile", josmSource + "/build.xml", "test-compile"]);
+  await exec("mvn", [
+    "--file",
+    josmSource + "/pom.xml",
+    "package",
+    "install",
+    "-DskipTests",
+  ]);
   const cwd = process.cwd();
   try {
     process.chdir(josmSource + "/test");
