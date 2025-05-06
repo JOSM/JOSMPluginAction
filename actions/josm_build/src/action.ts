@@ -68,7 +68,13 @@ async function buildJosm(
   );
   if (ivyHit == null || ivyHit === "") {
     await exec("ant", ["-buildfile", josmSource + "/build.xml", "resolve"]);
-    await exec("mvn", ["--file", josmSource + "/pom.xml", "clean", "validate"]);
+    await exec("mvn", [
+      "--file",
+      josmSource + "/pom.xml",
+      "--no-transfer-progress",
+      "clean",
+      "validate",
+    ]);
     await saveCache(
       ["~/.ivy2/cache", "~/.ant/cache", "~/.m2", josmSource + "/tools"],
       `${process.platform}-${process.arch}-ivy-${ivyFiles}`,
