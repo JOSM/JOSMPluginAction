@@ -25,6 +25,7 @@ jobs:
       repository: 'JOSM/Mapillary'
       ref: 'master'
       plugin-directory: 'Mapillary'
+      plugin-jar-name: 'Mapillary'
   call-workflow-min:
     uses: JOSM/JOSMPluginAction/.github/workflows/internal_ant.yml@main
     with:
@@ -33,3 +34,4 @@ jobs:
       repository: 'JOSM/Mapillary'
       ref: 'master'
       plugin-directory: 'Mapillary'
+      plugin-jar-name: 'Mapillary'
