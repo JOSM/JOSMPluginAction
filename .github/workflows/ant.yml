@@ -138,7 +138,7 @@ jobs:
         repository: ${{ inputs.repository }}
         ref: ${{ inputs.ref }}
         plugin-directory: ${{ inputs.plugin-directory }}
-        fetch-depth: 0
+        fetch-depth: 50
     - name: Set version information
       id: version
       run: |
@@ -165,6 +165,9 @@ jobs:
       run: |
         set -ex
         cd $GITHUB_WORKSPACE/josm/plugins/${{ inputs.plugin-directory }}
+        ls ../..
+        ls ../../core
+        ls ../../core/tools
         ls ../../core/tools/checkstyle
         mvn --file ../../core/pom.xml package install -DskipTests
         mvn --file pom.xml package javadoc:jar source:jar -DskipTests -Dplugin.dist.dir=../../dist -Dplugin.version=${{ steps.version.outputs.version }}
