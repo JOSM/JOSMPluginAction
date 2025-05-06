@@ -80082,7 +80082,7 @@ async function buildJosm(josmSource, josmRevision) {
     const ivyHit = await (0,cache.restoreCache)(["~/.ivy2/cache", "~/.ant/cache", "~/.m2", josmSource + "/tools"], `${process.platform}-${process.arch}-ivy-${ivyFiles}`);
     if (ivyHit == null || ivyHit === "") {
         await (0,exec.exec)("ant", ["-buildfile", josmSource + "/build.xml", "resolve"]);
-        await (0,exec.exec)("mvn", ["clean", "validate"]);
+        await (0,exec.exec)("mvn", ["--file", josmSource + "/pom.xml", "clean", "validate"]);
         await (0,cache.saveCache)(["~/.ivy2/cache", "~/.ant/cache", "~/.m2", josmSource + "/tools"], `${process.platform}-${process.arch}-ivy-${ivyFiles}`);
     }
     // Build with maven
