@@ -80095,6 +80095,7 @@ async function buildJosm(josmSource, josmRevision) {
     await (0,exec.exec)("mvn", [
         "--file",
         josmSource + "/pom.xml",
+        "--no-transfer-progress",
         "package",
         "install",
         "-DskipTests",
@@ -80121,6 +80122,7 @@ async function buildJosmTests(josmSource, josmRevision) {
     await (0,exec.exec)("mvn", [
         "--file",
         josmSource + "/pom.xml",
+        "--no-transfer-progress",
         "package",
         "install",
         "-DskipTests",
@@ -80133,6 +80135,7 @@ async function buildJosmTests(josmSource, josmRevision) {
             "../nodist/pom.xml",
             "--file",
             "pom.xml",
+            "--no-transfer-progress",
             "package",
             "install",
             "-DskipTests",
