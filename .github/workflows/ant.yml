@@ -170,7 +170,7 @@ jobs:
         ls ../../core
         ls ../../core/tools
         ls ../../core/tools/checkstyle
-        mvn --file pom.xml package javadoc:jar source:jar -DskipTests -Dplugin.dist.dir=../../dist -Dplugin.version=${{ steps.version.outputs.version }}
+        mvn --file pom.xml --no-transfer-progress package javadoc:jar source:jar -DskipTests -Dplugin.dist.dir=../../dist -Dplugin.version=${{ steps.version.outputs.version }}
         mv target/${{ inputs.plugin-jar-name }}-*-sources.jar ../../dist/${{ inputs.plugin-jar-name }}-sources.jar
         mv target/${{ inputs.plugin-jar-name }}-*-javadoc.jar ../../dist/${{ inputs.plugin-jar-name }}-javadoc.jar
 
@@ -243,7 +243,7 @@ jobs:
         
         if [ -f "pom.xml" ]; then
           echo "TEST_REPORT_PATH=target/surefire-reports" >> $GITHUB_ENV
-          mvn test
+          mvn --no-transfer-progress test
         elif [ -f "build.xml" ]; then
           echo "TEST_REPORT_PATH=${TEST_REPORT_PATH}" >> $GITHUB_ENV
           ant -diagnostics
