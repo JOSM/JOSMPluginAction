@@ -143,7 +143,7 @@ jobs:
       id: version
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ inputs.plugin-directory }}
-        if [ $GITHUB_REF_TYPE == "tag" ]; then
+        if [ $GITHUB_REF_TYPE != "tag" ]; then
           version=$GITHUB_REF_NAME
         else
           version="$(git describe --tags --always --dirty --broken)"
