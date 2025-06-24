@@ -25,6 +25,9 @@ inputs:
     default: '1'
     required: false
     description: "The number of commits to fetch. 0 indicates all history for all branches and tags. Default: 1"
+  fetch-tags:
+    description: 'Whether to fetch tags, even if fetch-depth > 0.'
+    default: true
   repository:
     default: ${{ github.repository }}
     required: false
@@ -60,6 +63,7 @@ runs:
     with:
       path: ${{ steps.josm-plugin-clone.outputs.plugin-dir }}/${{ inputs.plugin-directory }}
       fetch-depth: ${{ inputs.fetch-depth }}
+      fetch-tags: ${{ inputs.fetch-tags }}
       repository: '${{ inputs.repository }}'
       ref: ${{ inputs.ref }}
   - name: Get plugin dependencies
