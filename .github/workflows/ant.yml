@@ -148,6 +148,7 @@ jobs:
         else
           version="$(git describe --tags --always --dirty --broken)"
         fi
+        echo "Type $GITHUB_REF_TYPE Name $GITHUB_REF_NAME version ${version#v}"
         echo "version=${version#v}" >> $GITHUB_OUTPUT
         echo "plugin_directory=josm/plugins/${{ inputs.plugin-directory }}" >> $GITHUB_OUTPUT
 
