@@ -143,12 +143,14 @@ jobs:
       id: version
       run: |
         cd $GITHUB_WORKSPACE/josm/plugins/${{ inputs.plugin-directory }}
-        if [ $GITHUB_REF_TYPE != "tag" ]; then
+        if [ $GITHUB_REF_TYPE == "tag" ]; then
+          echo "Set version to tag"
           version=$GITHUB_REF_NAME
         else
+          echo "Extract version"
           version="$(git describe --tags --always --dirty --broken)"
         fi
-        echo "Type $GITHUB_REF_TYPE Name $GITHUB_REF_NAME version ${version#v}"
+        echo "Type $GITHUB_REF_TYPE Name $GITHUB_REF_NAME version full ${version#v} version ${version}"
         echo "version=${version#v}" >> $GITHUB_OUTPUT
         echo "plugin_directory=josm/plugins/${{ inputs.plugin-directory }}" >> $GITHUB_OUTPUT
 
