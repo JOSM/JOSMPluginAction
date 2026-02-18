@@ -56,6 +56,11 @@ on:
         default: ''
         required: false
         description: "A variable used for developing the GitHub Action. See actions/checkout@v6."
+      release:
+        type: boolean
+        default: true
+        required: false
+        description: "Perform the release creation if a tag is pushed"
     outputs:
       tag:
         description: "The release tag"
@@ -274,7 +279,7 @@ jobs:
   release:
     runs-on: ${{ inputs.operating-system }}
     needs: [create_tag, plugin-build, plugin-test, josm-build]
-    if: ${{ startsWith(github.ref, 'refs/tags/') || inputs.perform-revision-tagging }}
+    if: ${{ (startsWith(github.ref, 'refs/tags/') && inputs.release) || inputs.perform-revision-tagging }}
     steps:
     - name: Get build
       id: cache-plugin-build
