@@ -90,7 +90,7 @@ jobs:
     outputs:
       revision: ${{ steps.create_revision.outputs.revision }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         if: ${{ inputs.perform-revision-tagging }}
         with:
           fetch-depth: 0

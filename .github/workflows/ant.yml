@@ -50,12 +50,12 @@ on:
         type: string
         default: ${{ github.repository }}
         required: false
-        description: "A variable used for developing the GitHub Action. See actions/checkout@v4."
+        description: "A variable used for developing the GitHub Action. See actions/checkout@v6."
       ref:
         type: string
         default: ''
         required: false
-        description: "A variable used for developing the GitHub Action. See actions/checkout@v4."
+        description: "A variable used for developing the GitHub Action. See actions/checkout@v6."
     outputs:
       tag:
         description: "The release tag"
