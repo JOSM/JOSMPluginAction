@@ -57,7 +57,7 @@ export function parseData(trim: number, data: string | Buffer): Problem[] {
   const parser = new XMLParser({
     ignoreAttributes: false,
     isArray: (name, jpath) => {
-      return alwaysArray.indexOf(jpath) >= 0;
+      return typeof jpath === "string" && alwaysArray.includes(jpath);
     },
   });
   const parsed = parser.parse(data);
