@@ -50,7 +50,7 @@ runs:
   using: "composite"
   steps:
   - name: Set up JDK ${{ inputs.java-version }}
-    uses: actions/setup-java@v4
+    uses: actions/setup-java@v5
     with:
       java-version: ${{ inputs.java-version }}
       distribution: ${{ inputs.java-distribution }}
@@ -59,7 +59,7 @@ runs:
     id: josm-plugin-clone
     uses: JOSM/JOSMPluginAction/actions/josm_plugin_clone@v3
 
-  - uses: actions/checkout@v4
+  - uses: actions/checkout@v6
     with:
       path: ${{ steps.josm-plugin-clone.outputs.plugin-dir }}/${{ inputs.plugin-directory }}
       fetch-depth: ${{ inputs.fetch-depth }}

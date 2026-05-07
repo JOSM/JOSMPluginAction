@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Test Report
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: Ant reports for JOSM plugin ${{ github.event.repository.name }}-${{ inputs.java-version }}-${{ inputs.josm-revision }}
       - name: Publish Test Report
