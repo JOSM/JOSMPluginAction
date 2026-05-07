@@ -10,5 +10,5 @@ inputs:
     description: The PMD file to parse and upload
 
 runs:
-  using: "node20"
+  using: "node24"
   main: "dist/index.js"

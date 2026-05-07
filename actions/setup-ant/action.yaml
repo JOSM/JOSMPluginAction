@@ -9,5 +9,5 @@ outputs:
     description: The location of the ant install
 
 runs:
-  using: "node20"
+  using: "node24"
   main: "dist/index.js"

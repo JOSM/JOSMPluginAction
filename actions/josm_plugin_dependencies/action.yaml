@@ -11,5 +11,5 @@ inputs:
     description: "The name of the plugin jar. If not preset, defaults to repo name."
 
 runs:
-  using: "node20"
+  using: "node24"
   main: "dist/index.js"
