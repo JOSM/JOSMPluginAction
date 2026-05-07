@@ -13,8 +13,8 @@
   "author": "Taylor Smock",
   "license": "GPL-2.0-or-later",
   "dependencies": {
-    "@actions/core": "^1.11.1",
-    "@actions/tool-cache": "^2.0.2"
+    "@actions/core": "^3.0.1",
+    "@actions/tool-cache": "^4.0.0"
   },
   "devDependencies": {
     "@actions/io": "^1.1.3",

@@ -13,8 +13,8 @@
   "author": "Taylor Smock",
   "license": "GPL-2.0-or-later",
   "dependencies": {
-    "@actions/core": "^1.11.1",
-    "@actions/exec": "^1.1.1"
+    "@actions/core": "^3.0.1",
+    "@actions/exec": "^3.0.0"
   },
   "devDependencies": {
     "@vercel/ncc": "^0.38.3",
