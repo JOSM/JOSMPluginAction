@@ -31,11 +31,11 @@ inputs:
   repository:
     default: ${{ github.repository }}
     required: false
-    description: "A variable used for developing the GitHub Action. See actions/checkout@v4."
+    description: "A variable used for developing the GitHub Action. See actions/checkout@v6."
   ref:
     default: ''
     required: false
-    description: "A variable used for developing the GitHub Action. See actions/checkout@v4."
+    description: "A variable used for developing the GitHub Action. See actions/checkout@v6."
   plugin-directory:
     default: ${{ github.event.repository.name }}
     required: false
