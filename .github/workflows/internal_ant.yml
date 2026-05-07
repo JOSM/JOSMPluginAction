@@ -231,7 +231,7 @@ jobs:
     - name: Cache plugin test dependencies
       id: cache-plugin-test-dependencies
       if: steps.ivy-file-check.outputs.ivy-xml == 'true'
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         key: ${{ runner.os }}-${{ runner.arch }}-ivy-plugin-test-${{ hashFiles('**/ivy.xml') }}
         path: |
@@ -278,7 +278,7 @@ jobs:
     steps:
     - name: Get build
       id: cache-plugin-build
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: plugin-build-${{ inputs.java-version }}-${{ needs.josm-build.outputs.josm-revision }}
     - name: Set revision env variable
