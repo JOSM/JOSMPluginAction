@@ -265,7 +265,7 @@ jobs:
           josm/plugins/${{ inputs.plugin-directory }}/${{ env.TEST_REPORT_PATH }}/*.txt
           josm/plugins/${{ inputs.plugin-directory }}/${{ env.TEST_REPORT_PATH }}/TEST*.xml
     - name: Publish Test Report
-      uses: mikepenz/action-junit-report@v6
+      uses: mikepenz/action-junit-report@v4
       if: always() # always run even if the previous step fails
       with:
         report_paths: 'josm/plugins/${{ inputs.plugin-directory }}/${{ env.TEST_REPORT_PATH }}/TEST*.xml'
