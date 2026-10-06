@@ -35,7 +35,7 @@ on:
         required: false
       ant-version:
         type: string
-        default: 'apache-ant-1.10.15'
+        default: 'apache-ant-1.10.18'
       perform-revision-tagging:
         type: boolean
         default: false
