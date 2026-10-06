@@ -183,6 +183,7 @@ jobs:
         if [ ! -f "target/${jarname}"-*-sources.jar ] && [ -f "target/${{ inputs.plugin-directory }}"-*-sources.jar ]; then
             jarname=${{ inputs.plugin-directory }}
         fi
+        mv target/${jarname}-*.jar ./../dist/${{ inputs.plugin-jar-name }}.jar
         mv target/${jarname}-*-sources.jar ../../dist/${{ inputs.plugin-jar-name }}-sources.jar
         mv target/${jarname}-*-javadoc.jar ../../dist/${{ inputs.plugin-jar-name }}-javadoc.jar
 
