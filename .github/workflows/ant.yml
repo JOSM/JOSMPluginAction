@@ -178,12 +178,14 @@ jobs:
         ls ../../core
         ls ../../core/tools
         ls ../../core/tools/checkstyle
-        mvn --file pom.xml --no-transfer-progress package javadoc:jar source:jar -DskipTests -Dplugin.dist.dir=../../dist -Dplugin.version=${{ steps.version.outputs.version }}
+        mvn --file pom.xml --no-transfer-progress package javadoc:jar source:jar -DskipTests -Dplugin.dist.dir=../../dist -Dplugin.version=${{ steps.version.outputs.version }} -Drevision=${{ steps.version.outputs.version }}
         jarname=${{ inputs.plugin-jar-name }}
         if [ ! -f "target/${jarname}"-*-sources.jar ] && [ -f "target/${{ inputs.plugin-directory }}"-*-sources.jar ]; then
             jarname=${{ inputs.plugin-directory }}
         fi
-        mv target/${jarname}-${{ steps.version.outputs.version }}.jar ../../dist/${{ inputs.plugin-jar-name }}.jar
+        if [ -f "target/${jarname}-${{ steps.version.outputs.version }}.jar" ]; then
+            mv target/${jarname}-${{ steps.version.outputs.version }}.jar ../../dist/${{ inputs.plugin-jar-name }}.jar
+        fi
         mv target/${jarname}-*-sources.jar ../../dist/${{ inputs.plugin-jar-name }}-sources.jar
         mv target/${jarname}-*-javadoc.jar ../../dist/${{ inputs.plugin-jar-name }}-javadoc.jar
 
